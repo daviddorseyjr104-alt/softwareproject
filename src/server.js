@@ -19,17 +19,33 @@ const here = dirname(fileURLToPath(import.meta.url));
 const adminPage = join(here, '..', 'public', 'admin.html');
 
 function loginHtml(error = '') {
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Candidate Finder — Admin login</title>
-<style>body{font:16px system-ui,sans-serif;background:#0f172a;color:#e2e8f0;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0}
-.card{background:#1e293b;padding:2rem;border-radius:12px;width:320px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
-h1{font-size:1.1rem;margin:0 0 1rem}input{width:100%;box-sizing:border-box;padding:.6rem;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;margin-bottom:.75rem}
-button{width:100%;padding:.6rem;border:0;border-radius:8px;background:#3b82f6;color:#fff;font-weight:600;cursor:pointer}
-.err{color:#f87171;font-size:.9rem;margin-bottom:.5rem}</style></head>
+<style>
+*{box-sizing:border-box}
+body{font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,system-ui,sans-serif;color:#e8eef8;margin:0;min-height:100vh;
+  display:flex;align-items:center;justify-content:center;padding:1.5rem;-webkit-font-smoothing:antialiased;
+  background:radial-gradient(1000px 500px at 20% -10%,rgba(99,102,241,.16),transparent 60%),radial-gradient(900px 450px at 100% 0%,rgba(139,92,246,.12),transparent 55%),#0a0e1a}
+.card{background:linear-gradient(180deg,rgba(255,255,255,.02),transparent),#141d33;border:1px solid rgba(148,163,184,.14);
+  padding:2rem 1.9rem;border-radius:18px;width:100%;max-width:360px;box-shadow:0 24px 60px -20px rgba(0,0,0,.7)}
+.head{display:flex;align-items:center;gap:.7rem;margin-bottom:1.4rem}
+.mark{width:38px;height:38px;border-radius:11px;flex:none;display:grid;place-items:center;font-size:1.15rem;
+  background:linear-gradient(135deg,#6366f1,#8b5cf6);box-shadow:0 8px 20px -6px rgba(99,102,241,.7)}
+h1{font-size:1.05rem;margin:0;font-weight:650;letter-spacing:-.01em}
+.sub{font-size:.75rem;color:#5b6880;margin-top:1px}
+label{display:block;font-size:.78rem;color:#8a97ad;margin:0 0 .4rem;font-weight:500}
+input{width:100%;padding:.65rem .75rem;border-radius:10px;border:1px solid rgba(148,163,184,.24);background:#0d1424;color:#e8eef8;font:inherit;transition:border-color .15s,box-shadow .15s}
+input:focus{outline:none;border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.22)}
+button{width:100%;margin-top:1.1rem;padding:.7rem;border:0;border-radius:10px;color:#fff;font:inherit;font-weight:600;cursor:pointer;
+  background:linear-gradient(135deg,#6366f1,#8b5cf6);box-shadow:0 10px 24px -10px rgba(99,102,241,.9);transition:filter .15s,transform .12s}
+button:hover{filter:brightness(1.07);transform:translateY(-1px)}
+.err{color:#f87171;font-size:.85rem;margin-bottom:.9rem;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.28);padding:.55rem .7rem;border-radius:9px}
+</style></head>
 <body><form class="card" method="POST" action="/admin/login">
-<h1>🔒 Candidate Finder — Admin</h1>
+<div class="head"><div class="mark">🎯</div><div><h1>Candidate Finder</h1><div class="sub">Admin sign in</div></div></div>
 ${error ? `<div class="err">${error}</div>` : ''}
-<input type="password" name="password" placeholder="Admin password" autofocus>
+<label for="pw">Admin password</label>
+<input id="pw" type="password" name="password" placeholder="Enter your password" autofocus>
 <button type="submit">Sign in</button></form></body></html>`;
 }
 

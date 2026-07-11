@@ -5,63 +5,194 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Candidate Finder — Settings</title>
 <style>
-  :root { color-scheme: dark; }
+  :root {
+    color-scheme: dark;
+    --bg: #0a0e1a;
+    --surface: #121a2e;
+    --surface-2: #0d1424;
+    --card: #141d33;
+    --line: rgba(148, 163, 184, .14);
+    --line-strong: rgba(148, 163, 184, .24);
+    --text: #e8eef8;
+    --muted: #8a97ad;
+    --faint: #5b6880;
+    --brand: #6366f1;
+    --brand-2: #8b5cf6;
+    --ok: #34d399;
+    --bad: #f87171;
+    --warn: #fbbf24;
+    --radius: 16px;
+    --shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 10px 30px -12px rgba(0,0,0,.6);
+  }
   * { box-sizing: border-box; }
-  body { font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0;
-    background: #0f172a; color: #e2e8f0; }
-  header { display: flex; align-items: center; justify-content: space-between;
-    padding: 1rem 1.5rem; background: #111827; border-bottom: 1px solid #1f2937; position: sticky; top: 0; }
-  header h1 { font-size: 1.1rem; margin: 0; }
-  main { max-width: 900px; margin: 0 auto; padding: 1.5rem; }
-  .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px;
-    padding: 1.25rem 1.5rem; margin-bottom: 1.25rem; }
-  .card h2 { font-size: 1rem; margin: 0 0 1rem; display: flex; align-items: center; gap: .5rem; }
-  label { display: block; font-size: .85rem; color: #94a3b8; margin: .75rem 0 .25rem; }
-  input, textarea, select { width: 100%; padding: .5rem .6rem; border-radius: 8px;
-    border: 1px solid #334155; background: #0f172a; color: #e2e8f0; font: inherit; }
-  textarea { min-height: 220px; font-family: ui-monospace, monospace; font-size: 13px; white-space: pre; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, system-ui, sans-serif;
+    margin: 0; color: var(--text);
+    background:
+      radial-gradient(1200px 600px at 15% -10%, rgba(99,102,241,.14), transparent 60%),
+      radial-gradient(1000px 500px at 100% 0%, rgba(139,92,246,.10), transparent 55%),
+      var(--bg);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Header */
+  header {
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    padding: .85rem 1.5rem; position: sticky; top: 0; z-index: 20;
+    background: rgba(10, 14, 26, .72);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: center; gap: .7rem; min-width: 0; }
+  .brand .mark {
+    width: 34px; height: 34px; border-radius: 10px; flex: none;
+    display: grid; place-items: center; font-size: 1.05rem;
+    background: linear-gradient(135deg, var(--brand), var(--brand-2));
+    box-shadow: 0 6px 18px -6px rgba(99,102,241,.7);
+  }
+  .brand h1 { font-size: 1.02rem; margin: 0; font-weight: 650; letter-spacing: -.01em; white-space: nowrap; }
+  .brand .sub { font-size: .72rem; color: var(--faint); margin-top: -1px; }
+
+  main { max-width: 960px; margin: 0 auto; padding: 1.75rem 1.5rem 4rem; }
+
+  /* Cards */
+  .card {
+    background: linear-gradient(180deg, rgba(255,255,255,.015), transparent), var(--card);
+    border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 1.35rem 1.5rem; margin-bottom: 1.25rem; box-shadow: var(--shadow);
+  }
+  .card-head { display: flex; align-items: center; gap: .7rem; margin: 0 0 .35rem; }
+  .card-head .ico {
+    width: 30px; height: 30px; border-radius: 9px; flex: none; display: grid; place-items: center;
+    font-size: .95rem; background: rgba(99,102,241,.12); border: 1px solid rgba(99,102,241,.22);
+  }
+  .card-head h2 { font-size: 1.02rem; margin: 0; font-weight: 620; letter-spacing: -.01em; }
+  .card-desc { color: var(--muted); font-size: .85rem; margin: .1rem 0 1rem; }
+
+  /* Forms */
+  label { display: block; font-size: .78rem; color: var(--muted); margin: .8rem 0 .3rem; font-weight: 500; letter-spacing: .01em; }
+  input, textarea, select {
+    width: 100%; padding: .58rem .7rem; border-radius: 10px; border: 1px solid var(--line-strong);
+    background: var(--surface-2); color: var(--text); font: inherit; transition: border-color .15s, box-shadow .15s, background .15s;
+  }
+  input::placeholder { color: var(--faint); }
+  input:focus, textarea:focus, select:focus {
+    outline: none; border-color: var(--brand);
+    box-shadow: 0 0 0 3px rgba(99,102,241,.22); background: #0b1220;
+  }
+  textarea {
+    min-height: 220px; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12.5px; line-height: 1.5; white-space: pre; resize: vertical;
+  }
+  select { appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238a97ad' d='M6 8L2 4h8z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right .7rem center; padding-right: 1.9rem; }
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
-  button { padding: .55rem 1rem; border: 0; border-radius: 8px; background: #3b82f6; color: #fff;
-    font-weight: 600; cursor: pointer; }
-  button.secondary { background: #334155; }
-  button:disabled { opacity: .6; cursor: default; }
-  .actions { margin-top: 1rem; display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
-  .pill { display: inline-flex; align-items: center; gap: .35rem; padding: .15rem .55rem;
-    border-radius: 999px; font-size: .8rem; background: #0f172a; border: 1px solid #334155; }
-  .ok { color: #4ade80; } .bad { color: #f87171; } .warn { color: #fbbf24; } .muted { color: #64748b; }
-  .toast { position: fixed; bottom: 1rem; right: 1rem; background: #334155; padding: .6rem 1rem;
-    border-radius: 8px; opacity: 0; transition: opacity .2s; }
-  .toast.show { opacity: 1; }
-  code { background: #0f172a; padding: .15rem .4rem; border-radius: 6px; font-size: 13px; }
-  .keyrow { display: grid; grid-template-columns: 130px 1fr 90px; gap: .75rem; align-items: center; margin-bottom: .5rem; }
+  .row3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+  .row4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+  .row + .row, .row3 + .row3, .row + .row3, .row3 + .row, .row4 + .row3 { margin-top: .25rem; }
+
+  /* Buttons */
+  button {
+    padding: .6rem 1.1rem; border: 1px solid transparent; border-radius: 10px; cursor: pointer;
+    font: inherit; font-weight: 600; letter-spacing: .01em; color: #fff;
+    background: linear-gradient(135deg, var(--brand), var(--brand-2));
+    box-shadow: 0 8px 20px -10px rgba(99,102,241,.9); transition: transform .12s, box-shadow .15s, filter .15s;
+  }
+  button:hover { filter: brightness(1.07); transform: translateY(-1px); }
+  button:active { transform: translateY(0); }
+  button.secondary {
+    background: rgba(148,163,184,.1); border-color: var(--line-strong); color: var(--text);
+    box-shadow: none;
+  }
+  button.secondary:hover { background: rgba(148,163,184,.18); filter: none; }
+  button:disabled { opacity: .55; cursor: default; transform: none; filter: none; }
+  .actions { margin-top: 1.15rem; display: flex; gap: .7rem; align-items: center; flex-wrap: wrap; }
+
+  /* Pills / status */
+  .pill {
+    display: inline-flex; align-items: center; gap: .4rem; padding: .3rem .7rem;
+    border-radius: 999px; font-size: .8rem; font-weight: 500;
+    background: var(--surface-2); border: 1px solid var(--line-strong); color: #cdd6e4;
+  }
+  .pill.warn { background: rgba(251,191,36,.1); border-color: rgba(251,191,36,.3); }
+  .statusgrid { display: flex; flex-wrap: wrap; gap: .55rem; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); } .warn { color: var(--warn); } .muted { color: var(--muted); }
   .status { font-size: .85rem; }
-  table { width: 100%; border-collapse: collapse; font-size: .85rem; }
-  td, th { text-align: left; padding: .35rem .5rem; border-bottom: 1px solid #1f2937; }
+
+  /* Webhook block */
+  .hooklabel { font-size: .78rem; color: var(--muted); margin: 1.2rem 0 .4rem; font-weight: 500; }
+  .hookbox { display: flex; align-items: stretch; gap: .5rem; }
+  .hookbox code {
+    flex: 1; min-width: 0; background: var(--surface-2); border: 1px solid var(--line-strong);
+    padding: .6rem .75rem; border-radius: 10px; font-size: 12.5px; color: #b9c4d6;
+    overflow-x: auto; white-space: nowrap; font-family: ui-monospace, Menlo, Consolas, monospace;
+  }
+  .copybtn { flex: none; padding: 0 .85rem; font-size: .82rem; }
+  .hint { color: var(--faint); font-size: .78rem; margin: .55rem 0 0; }
+  code.inline { background: var(--surface-2); border: 1px solid var(--line); padding: .1rem .4rem; border-radius: 6px; font-size: 12.5px; }
+
+  /* Key rows */
+  .keyrow { display: grid; grid-template-columns: 120px 1fr 96px; gap: .75rem; align-items: center; margin-bottom: .55rem; }
+  .keyrow label { margin: 0; color: var(--text); font-weight: 500; font-size: .85rem; }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; font-size: .85rem; margin-top: .4rem; }
+  th { text-align: left; padding: .5rem .6rem; color: var(--faint); font-weight: 600; font-size: .72rem;
+    text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid var(--line-strong); }
+  td { text-align: left; padding: .55rem .6rem; border-bottom: 1px solid var(--line); }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr:hover td { background: rgba(148,163,184,.04); }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 1.25rem; right: 1.25rem; z-index: 50;
+    background: #1c2740; border: 1px solid var(--line-strong); color: var(--text);
+    padding: .7rem 1.1rem; border-radius: 12px; box-shadow: 0 12px 30px -10px rgba(0,0,0,.7);
+    opacity: 0; transform: translateY(8px); transition: opacity .2s, transform .2s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+
+  @media (max-width: 720px) {
+    .row, .row3, .row4 { grid-template-columns: 1fr; }
+    .keyrow { grid-template-columns: 1fr; gap: .35rem; }
+    main { padding: 1.25rem 1rem 3rem; }
+    header { padding: .75rem 1rem; }
+    .brand .sub { display: none; }
+  }
 </style>
 </head>
 <body>
 <header>
-  <h1>🎯 Candidate Finder — Settings</h1>
+  <div class="brand">
+    <div class="mark">🎯</div>
+    <div>
+      <h1>Candidate Finder</h1>
+      <div class="sub">Admin &amp; settings</div>
+    </div>
+  </div>
   <form method="POST" action="/admin/logout"><button class="secondary" type="submit">Log out</button></form>
 </header>
 <main>
 
   <!-- Readiness -->
   <div class="card" id="status-card">
-    <h2>📊 Readiness</h2>
+    <div class="card-head"><div class="ico">📊</div><h2>Readiness</h2></div>
     <div id="status">Loading…</div>
-    <div class="actions">
-      <span class="muted">Webhook URL for GoHighLevel / Flowsa:</span>
+    <div class="hooklabel">Webhook URL for GoHighLevel / Flowsa</div>
+    <div class="hookbox">
+      <code id="webhook-url">…</code>
+      <button class="secondary copybtn" onclick="copyWebhook()">Copy</button>
     </div>
-    <div><code id="webhook-url">…</code></div>
-    <p class="muted" style="font-size:.8rem">Add your <code>WEBHOOK_SECRET</code> (set on the host) as the <code>?secret=</code> value or an <code>x-webhook-secret</code> header.</p>
+    <p class="hint">Add your <code class="inline">WEBHOOK_SECRET</code> (set on the host) as the <code class="inline">?secret=</code> value or an <code class="inline">x-webhook-secret</code> header.</p>
   </div>
 
   <!-- API keys -->
   <div class="card">
-    <h2>🔑 API keys</h2>
-    <p class="muted" style="font-size:.85rem;margin-top:0">Leave a field blank to keep the current key. Keys are stored encrypted. See <code>docs/GETTING-KEYS.md</code>.</p>
+    <div class="card-head"><div class="ico">🔑</div><h2>API keys</h2></div>
+    <p class="card-desc">Leave a field blank to keep the current key. Keys are stored encrypted. See <code class="inline">docs/GETTING-KEYS.md</code>.</p>
     <div id="keys"></div>
     <div class="actions">
       <button onclick="saveKeys()">Save keys</button>
@@ -72,7 +203,7 @@
 
   <!-- Behaviour -->
   <div class="card">
-    <h2>⚙️ Behaviour &amp; scoring</h2>
+    <div class="card-head"><div class="ico">⚙️</div><h2>Behaviour &amp; scoring</h2></div>
     <div class="row3">
       <div><label>Max candidates / role</label><input id="maxCandidates" type="number"></div>
       <div><label>Score threshold (0–100)</label><input id="scoreThreshold" type="number"></div>
@@ -80,7 +211,7 @@
         <select id="aiEffort"><option>low</option><option>medium</option><option>high</option><option>xhigh</option><option>max</option></select>
       </div>
     </div>
-    <div class="row" style="grid-template-columns:1fr 1fr 1fr 1fr">
+    <div class="row4">
       <div><label>Weight: AI</label><input id="weightAi" type="number" step="0.05"></div>
       <div><label>Weight: skills</label><input id="weightSkills" type="number" step="0.05"></div>
       <div><label>Weight: seniority</label><input id="weightSeniority" type="number" step="0.05"></div>
@@ -105,8 +236,8 @@
 
   <!-- Pool -->
   <div class="card">
-    <h2>🏢 Companies &amp; roles</h2>
-    <p class="muted" style="font-size:.85rem;margin-top:0">Edit the JSON, then Save — it is validated before it is stored.</p>
+    <div class="card-head"><div class="ico">🏢</div><h2>Companies &amp; roles</h2></div>
+    <p class="card-desc">Edit the JSON, then Save — it is validated before it is stored.</p>
     <label>companies.json</label>
     <textarea id="companies"></textarea>
     <label>company-tiers.json (employer pedigree)</label>
@@ -116,8 +247,8 @@
 
   <!-- Jobs -->
   <div class="card">
-    <h2>📨 Recent runs</h2>
-    <div class="actions"><button class="secondary" onclick="loadJobs()">Refresh</button></div>
+    <div class="card-head"><div class="ico">📨</div><h2>Recent runs</h2></div>
+    <div class="actions" style="margin-top:.25rem"><button class="secondary" onclick="loadJobs()">Refresh</button></div>
     <table><thead><tr><th>When</th><th>Company</th><th>Status</th><th>Result</th></tr></thead><tbody id="jobs"></tbody></table>
   </div>
 
@@ -133,6 +264,11 @@ async function api(path, opts) {
   return res.json();
 }
 function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2200); }
+
+function copyWebhook() {
+  const text = $('webhook-url').textContent;
+  navigator.clipboard?.writeText(text).then(() => toast('Webhook URL copied.'), () => toast('Copy failed — select manually.'));
+}
 
 function renderKeys(keys) {
   $('keys').innerHTML = KEY_SERVICES.map(([k, label]) => {
@@ -168,7 +304,7 @@ async function loadStatus() {
   const dot = (ok) => ok ? '<span class=ok>●</span>' : '<span class=bad>●</span>';
   const k = st.keys;
   $('status').innerHTML =
-    `<div class="actions">
+    `<div class="statusgrid">
       <span class="pill">${dot(k.apollo.set)} Apollo</span>
       <span class="pill">${dot(k.salesql.set)} SalesQL</span>
       <span class="pill">${dot(k.instantly.set)} Instantly</span>
