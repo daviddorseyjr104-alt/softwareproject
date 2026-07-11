@@ -1,0 +1,8 @@
+{
+  "_comment": "Pedigree lookup: which PRIOR employers make a candidate look strong. tier 1 = elite. Match is case-insensitive substring on the candidate's current company. Copy to data/company-tiers.json and extend. Unlisted companies score neutral. This is a seed list, not exhaustive.",
+  "tiers": {
+    "1": ["Google", "Meta", "Apple", "Amazon", "Microsoft", "Netflix", "Nvidia", "OpenAI", "Anthropic", "Stripe", "Databricks"],
+    "2": ["Airbnb", "Uber", "Lyft", "Dropbox", "Snowflake", "Coinbase", "Datadog", "Cloudflare", "Twilio", "Shopify", "Atlassian", "Pinterest"],
+    "3": ["Salesforce", "Oracle", "IBM", "Intel", "Adobe", "SAP", "Cisco", "VMware", "Dell", "PayPal"]
+  }
+}

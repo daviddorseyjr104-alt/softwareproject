@@ -1,0 +1,14 @@
+node_modules
+.env
+.env.local
+*.log
+logs
+data/settings.json
+data/jobs.json
+data/companies.json
+data/company-tiers.json
+.git
+test
+docs
+scripts/demo.js
+.DS_Store

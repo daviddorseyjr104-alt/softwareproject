@@ -1,0 +1,43 @@
+{
+  "_comment": "Your pool of hiring companies and their open roles. Copy to data/companies.json and edit. `tier` (1=top) feeds candidate pedigree scoring and also ranks companies when a candidate fits several. `capacity` caps how many candidates get matched to that role.",
+  "companies": [
+    {
+      "id": "elitetech",
+      "name": "EliteTech",
+      "tier": 1,
+      "location": "New York, New York",
+      "roles": [
+        {
+          "id": "elitetech-senior-be",
+          "title": "Senior Backend Engineer",
+          "searchTitles": ["Senior Backend Engineer", "Senior Software Engineer", "Backend Engineer"],
+          "seniority": ["senior", "manager"],
+          "requiredSkills": ["Go", "Kubernetes", "PostgreSQL", "AWS", "microservices"],
+          "niceToHaveSkills": ["Kafka", "gRPC", "Terraform"],
+          "salary": "$180,000 - $220,000",
+          "location": "New York, New York",
+          "capacity": 10
+        }
+      ]
+    },
+    {
+      "id": "bluewave",
+      "name": "BlueWave Labs",
+      "tier": 2,
+      "location": "Los Angeles, California",
+      "roles": [
+        {
+          "id": "bluewave-fe",
+          "title": "Frontend Engineer",
+          "searchTitles": ["Frontend Engineer", "Software Engineer", "React Developer"],
+          "seniority": ["senior", "mid"],
+          "requiredSkills": ["React", "TypeScript", "Next.js", "CSS", "GraphQL"],
+          "niceToHaveSkills": ["React Native", "Node.js"],
+          "salary": "$150,000 - $185,000",
+          "location": "Los Angeles, California",
+          "capacity": 8
+        }
+      ]
+    }
+  ]
+}

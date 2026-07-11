@@ -1,0 +1,34 @@
+# One-click deploy config for Render (https://render.com).
+# In Render: New + → Blueprint → connect this repo → it reads this file.
+#
+# The persistent disk (below) keeps client keys / jobs / pool across restarts and needs a paid
+# instance (Starter, ~$7/mo). On the FREE plan, remove the `disk:` block and instead set the API
+# keys as env vars (APOLLO_API_KEY, SALESQL_API_KEY, INSTANTLY_API_KEY, ANTHROPIC_API_KEY) — the
+# app falls back to them. See docs/DEPLOY.md.
+services:
+  - type: web
+    name: candidate-finder
+    runtime: node
+    plan: starter
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /var/data
+      # Generated once by Render and kept stable — used to sign admin sessions + encrypt keys.
+      - key: SECRET_KEY
+        generateValue: true
+      # Secret the GoHighLevel/Flowsa webhook must send. Generated; view it in the Render dashboard.
+      - key: WEBHOOK_SECRET
+        generateValue: true
+      # You set this — the password for the /admin settings page.
+      - key: ADMIN_PASSWORD
+        sync: false
+    disk:
+      name: candidate-finder-data
+      mountPath: /var/data
+      sizeGB: 1

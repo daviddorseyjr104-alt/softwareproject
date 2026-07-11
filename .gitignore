@@ -1,0 +1,13 @@
+node_modules/
+.env
+.env.local
+*.log
+logs/
+.DS_Store
+
+# Durable runtime state (API keys, jobs, client-edited pool) — never commit.
+# The committed sample files use the .example.json suffix and are kept.
+data/settings.json
+data/jobs.json
+data/companies.json
+data/company-tiers.json

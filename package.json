@@ -1,0 +1,28 @@
+{
+  "name": "kaizen-candidate-finder",
+  "version": "1.0.0",
+  "description": "Candidate Finder automation backend: Flowsa/GoHighLevel form webhook -> Apollo discovery -> SalesQL personal-email enrichment -> Instantly campaign.",
+  "type": "module",
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "demo": "node scripts/demo.js",
+    "test": "node --test test/*.test.js",
+    "match": "node scripts/match.js",
+    "doctor": "node scripts/doctor.js",
+    "test-keys": "node scripts/test-keys.js",
+    "dry-run": "node scripts/dry-run.js",
+    "check-config": "node scripts/check-config.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.111.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}

@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Candidate Finder — Settings</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0;
+    background: #0f172a; color: #e2e8f0; }
+  header { display: flex; align-items: center; justify-content: space-between;
+    padding: 1rem 1.5rem; background: #111827; border-bottom: 1px solid #1f2937; position: sticky; top: 0; }
+  header h1 { font-size: 1.1rem; margin: 0; }
+  main { max-width: 900px; margin: 0 auto; padding: 1.5rem; }
+  .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+    padding: 1.25rem 1.5rem; margin-bottom: 1.25rem; }
+  .card h2 { font-size: 1rem; margin: 0 0 1rem; display: flex; align-items: center; gap: .5rem; }
+  label { display: block; font-size: .85rem; color: #94a3b8; margin: .75rem 0 .25rem; }
+  input, textarea, select { width: 100%; padding: .5rem .6rem; border-radius: 8px;
+    border: 1px solid #334155; background: #0f172a; color: #e2e8f0; font: inherit; }
+  textarea { min-height: 220px; font-family: ui-monospace, monospace; font-size: 13px; white-space: pre; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+  button { padding: .55rem 1rem; border: 0; border-radius: 8px; background: #3b82f6; color: #fff;
+    font-weight: 600; cursor: pointer; }
+  button.secondary { background: #334155; }
+  button:disabled { opacity: .6; cursor: default; }
+  .actions { margin-top: 1rem; display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+  .pill { display: inline-flex; align-items: center; gap: .35rem; padding: .15rem .55rem;
+    border-radius: 999px; font-size: .8rem; background: #0f172a; border: 1px solid #334155; }
+  .ok { color: #4ade80; } .bad { color: #f87171; } .warn { color: #fbbf24; } .muted { color: #64748b; }
+  .toast { position: fixed; bottom: 1rem; right: 1rem; background: #334155; padding: .6rem 1rem;
+    border-radius: 8px; opacity: 0; transition: opacity .2s; }
+  .toast.show { opacity: 1; }
+  code { background: #0f172a; padding: .15rem .4rem; border-radius: 6px; font-size: 13px; }
+  .keyrow { display: grid; grid-template-columns: 130px 1fr 90px; gap: .75rem; align-items: center; margin-bottom: .5rem; }
+  .status { font-size: .85rem; }
+  table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  td, th { text-align: left; padding: .35rem .5rem; border-bottom: 1px solid #1f2937; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎯 Candidate Finder — Settings</h1>
+  <form method="POST" action="/admin/logout"><button class="secondary" type="submit">Log out</button></form>
+</header>
+<main>
+
+  <!-- Readiness -->
+  <div class="card" id="status-card">
+    <h2>📊 Readiness</h2>
+    <div id="status">Loading…</div>
+    <div class="actions">
+      <span class="muted">Webhook URL for GoHighLevel / Flowsa:</span>
+    </div>
+    <div><code id="webhook-url">…</code></div>
+    <p class="muted" style="font-size:.8rem">Add your <code>WEBHOOK_SECRET</code> (set on the host) as the <code>?secret=</code> value or an <code>x-webhook-secret</code> header.</p>
+  </div>
+
+  <!-- API keys -->
+  <div class="card">
+    <h2>🔑 API keys</h2>
+    <p class="muted" style="font-size:.85rem;margin-top:0">Leave a field blank to keep the current key. Keys are stored encrypted. See <code>docs/GETTING-KEYS.md</code>.</p>
+    <div id="keys"></div>
+    <div class="actions">
+      <button onclick="saveKeys()">Save keys</button>
+      <button class="secondary" onclick="testKeys()">Test keys</button>
+      <span id="keys-msg" class="status muted"></span>
+    </div>
+  </div>
+
+  <!-- Behaviour -->
+  <div class="card">
+    <h2>⚙️ Behaviour &amp; scoring</h2>
+    <div class="row3">
+      <div><label>Max candidates / role</label><input id="maxCandidates" type="number"></div>
+      <div><label>Score threshold (0–100)</label><input id="scoreThreshold" type="number"></div>
+      <div><label>AI effort</label>
+        <select id="aiEffort"><option>low</option><option>medium</option><option>high</option><option>xhigh</option><option>max</option></select>
+      </div>
+    </div>
+    <div class="row" style="grid-template-columns:1fr 1fr 1fr 1fr">
+      <div><label>Weight: AI</label><input id="weightAi" type="number" step="0.05"></div>
+      <div><label>Weight: skills</label><input id="weightSkills" type="number" step="0.05"></div>
+      <div><label>Weight: seniority</label><input id="weightSeniority" type="number" step="0.05"></div>
+      <div><label>Weight: pedigree</label><input id="weightPedigree" type="number" step="0.05"></div>
+    </div>
+    <div class="row3">
+      <div><label>Instantly timezone</label><input id="instantlyTimezone"></div>
+      <div><label>Send from</label><input id="instantlySendingFrom" placeholder="09:00"></div>
+      <div><label>Send to</label><input id="instantlySendingTo" placeholder="17:00"></div>
+    </div>
+    <div class="row">
+      <div><label>Instantly template campaign id (optional)</label><input id="instantlyTemplateCampaignId"></div>
+      <div><label>Test company names (comma-sep — force dry-run)</label><input id="testCompanyNames"></div>
+    </div>
+    <div class="row3">
+      <div><label>Personal emails only</label><select id="personalOnly"><option value="true">true</option><option value="false">false</option></select></div>
+      <div><label>Dry run (create nothing in Instantly)</label><select id="dryRun"><option value="true">true</option><option value="false">false</option></select></div>
+      <div><label>Apollo seniorities (comma-sep)</label><input id="seniorities"></div>
+    </div>
+    <div class="actions"><button onclick="saveSettings()">Save settings</button><span id="settings-msg" class="status muted"></span></div>
+  </div>
+
+  <!-- Pool -->
+  <div class="card">
+    <h2>🏢 Companies &amp; roles</h2>
+    <p class="muted" style="font-size:.85rem;margin-top:0">Edit the JSON, then Save — it is validated before it is stored.</p>
+    <label>companies.json</label>
+    <textarea id="companies"></textarea>
+    <label>company-tiers.json (employer pedigree)</label>
+    <textarea id="tiers"></textarea>
+    <div class="actions"><button onclick="savePool()">Save pool</button><span id="pool-msg" class="status muted"></span></div>
+  </div>
+
+  <!-- Jobs -->
+  <div class="card">
+    <h2>📨 Recent runs</h2>
+    <div class="actions"><button class="secondary" onclick="loadJobs()">Refresh</button></div>
+    <table><thead><tr><th>When</th><th>Company</th><th>Status</th><th>Result</th></tr></thead><tbody id="jobs"></tbody></table>
+  </div>
+
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const KEY_SERVICES = [['apollo','Apollo'],['salesql','SalesQL'],['instantly','Instantly'],['anthropic','Anthropic (opt)']];
+async function api(path, opts) {
+  const res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...opts });
+  if (res.status === 401) { location.href = '/admin/login'; throw new Error('unauthorized'); }
+  return res.json();
+}
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2200); }
+
+function renderKeys(keys) {
+  $('keys').innerHTML = KEY_SERVICES.map(([k, label]) => {
+    const set = keys[k]?.set;
+    const hint = set ? `saved ••••${keys[k].last4}` : 'not set';
+    return `<div class="keyrow"><label style="margin:0">${label}</label>
+      <input id="key-${k}" type="password" placeholder="${hint}">
+      <span class="status" id="keystat-${k}">${set ? '<span class=ok>saved</span>' : '<span class=muted>—</span>'}</span></div>`;
+  }).join('');
+}
+
+async function load() {
+  const s = await api('/admin/api/settings');
+  renderKeys(s.keys);
+  const v = s.values;
+  for (const id of ['maxCandidates','scoreThreshold','aiEffort','weightAi','weightSkills','weightSeniority','weightPedigree','instantlyTimezone','instantlySendingFrom','instantlySendingTo','instantlyTemplateCampaignId'])
+    if ($(id) != null) $(id).value = v[id] ?? '';
+  $('personalOnly').value = String(v.personalOnly);
+  $('dryRun').value = String(v.dryRun);
+  $('seniorities').value = (v.seniorities || []).join(', ');
+  $('testCompanyNames').value = (v.testCompanyNames || []).join(', ');
+
+  const pool = await api('/admin/api/pool');
+  $('companies').value = JSON.stringify(pool.companies, null, 2);
+  $('tiers').value = JSON.stringify(pool.tiers, null, 2);
+
+  $('webhook-url').textContent = location.origin + '/webhook/candidate-finder?secret=YOUR_WEBHOOK_SECRET';
+  loadStatus(); loadJobs();
+}
+
+async function loadStatus() {
+  const st = await api('/admin/api/status');
+  const dot = (ok) => ok ? '<span class=ok>●</span>' : '<span class=bad>●</span>';
+  const k = st.keys;
+  $('status').innerHTML =
+    `<div class="actions">
+      <span class="pill">${dot(k.apollo.set)} Apollo</span>
+      <span class="pill">${dot(k.salesql.set)} SalesQL</span>
+      <span class="pill">${dot(k.instantly.set)} Instantly</span>
+      <span class="pill">${k.anthropic.set ? '<span class=ok>●</span>' : '<span class=warn>●</span>'} Anthropic</span>
+      <span class="pill">${dot(st.pool.ok)} Pool — ${st.pool.detail}</span>
+      <span class="pill">${st.dryRun ? '<span class=warn>DRY RUN</span>' : '<span class=ok>LIVE</span>'}</span>
+      ${st.demo ? '<span class="pill warn">DEMO MODE</span>' : ''}
+    </div>`;
+}
+
+async function saveKeys() {
+  const patch = {};
+  for (const [k] of KEY_SERVICES) { const val = $('key-'+k).value.trim(); if (val) patch[k+'ApiKey'] = val; }
+  if (!Object.keys(patch).length) return toast('Nothing to save — enter a key first.');
+  const r = await api('/admin/api/settings', { method: 'POST', body: JSON.stringify(patch) });
+  if (r.ok) { toast('Keys saved.'); load(); } else toast('Error: ' + r.error);
+}
+
+async function testKeys() {
+  $('keys-msg').textContent = 'Testing…';
+  const body = {};
+  for (const [k] of KEY_SERVICES) { const val = $('key-'+k).value.trim(); if (val) body[k] = val; }
+  const r = await api('/admin/api/test-keys', { method: 'POST', body: JSON.stringify(body) });
+  for (const [k] of KEY_SERVICES) {
+    const v = r[k]; const el = $('keystat-'+k);
+    const cls = v.status === 'valid' ? 'ok' : v.status === 'unset' ? 'muted' : v.status === 'error' ? 'warn' : 'bad';
+    const icon = v.status === 'valid' ? '✅' : v.status === 'unset' ? '⬜' : v.status === 'error' ? '⚠️' : '❌';
+    el.innerHTML = `<span class="${cls}">${icon} ${v.detail}</span>`;
+  }
+  $('keys-msg').textContent = '';
+}
+
+async function saveSettings() {
+  const num = (id) => { const n = parseFloat($(id).value); return Number.isFinite(n) ? n : undefined; };
+  const patch = {
+    maxCandidates: num('maxCandidates'), scoreThreshold: num('scoreThreshold'), aiEffort: $('aiEffort').value,
+    weightAi: num('weightAi'), weightSkills: num('weightSkills'), weightSeniority: num('weightSeniority'), weightPedigree: num('weightPedigree'),
+    instantlyTimezone: $('instantlyTimezone').value, instantlySendingFrom: $('instantlySendingFrom').value, instantlySendingTo: $('instantlySendingTo').value,
+    instantlyTemplateCampaignId: $('instantlyTemplateCampaignId').value,
+    personalOnly: $('personalOnly').value === 'true', dryRun: $('dryRun').value === 'true',
+    seniorities: $('seniorities').value.split(',').map(s => s.trim()).filter(Boolean),
+    testCompanyNames: $('testCompanyNames').value.split(',').map(s => s.trim()).filter(Boolean),
+  };
+  const r = await api('/admin/api/settings', { method: 'POST', body: JSON.stringify(patch) });
+  if (r.ok) { toast('Settings saved.'); loadStatus(); } else toast('Error: ' + r.error);
+}
+
+async function savePool() {
+  let companies, tiers;
+  try { companies = JSON.parse($('companies').value); tiers = JSON.parse($('tiers').value); }
+  catch (e) { return toast('Invalid JSON: ' + e.message); }
+  const r = await api('/admin/api/pool', { method: 'POST', body: JSON.stringify({ companies, tiers }) });
+  if (r.ok) { toast('Pool saved.'); loadStatus(); } else toast('Rejected: ' + r.error);
+}
+
+async function loadJobs() {
+  const { jobs } = await api('/admin/api/jobs');
+  $('jobs').innerHTML = (jobs || []).map(j => {
+    const cls = j.status === 'done' ? 'ok' : j.status === 'failed' ? 'bad' : 'warn';
+    const result = j.summary ? `matched ${j.summary.matched ?? j.summary.leadsAdded ?? '—'}` : (j.error || '');
+    return `<tr><td class="muted">${(j.createdAt||'').replace('T',' ').slice(0,16)}</td><td>${j.company||''}</td>
+      <td class="${cls}">${j.status}</td><td class="muted">${result}</td></tr>`;
+  }).join('') || '<tr><td colspan="4" class="muted">No runs yet.</td></tr>';
+}
+
+load();
+</script>
+</body>
+</html>
