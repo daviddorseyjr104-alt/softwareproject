@@ -121,6 +121,8 @@ function build() {
     },
     dryRun,
     testCompanyNames: list(v.testCompanyNames ?? process.env.TEST_COMPANY_NAMES).map((s) => s.toLowerCase()),
+    // Cross-run dedup: don't re-email anyone contacted within this many days (0 = off).
+    dedupeWindowDays: int(v.dedupeWindowDays ?? process.env.DEDUPE_WINDOW_DAYS, 0),
   };
 }
 
@@ -197,6 +199,7 @@ export function getMaskedSettings() {
       weightPedigree: s.scoring.weights.pedigree,
       dryRun: s.dryRun,
       testCompanyNames: s.testCompanyNames,
+      dedupeWindowDays: s.dedupeWindowDays,
     },
     encryptionEnabled: Boolean(bootConfig.secretKey),
   };

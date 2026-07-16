@@ -53,7 +53,9 @@ export async function aiFitScore(candidate, role, log) {
   try {
     const res = await anthropic.messages.create({
       model: MODEL,
-      max_tokens: 1024,
+      // Adaptive thinking shares this budget with the JSON output; 1024 could truncate
+      // the structured result (→ JSON.parse throws → candidate silently loses its AI score).
+      max_tokens: 4096,
       thinking: { type: 'adaptive' },
       output_config: {
         effort: getSettings().ai.effort, // 'low' by default — scoring is simple, keep cost down
@@ -69,6 +71,11 @@ export async function aiFitScore(candidate, role, log) {
 
     if (res.stop_reason === 'refusal') {
       log?.warn('ai fit refused', { candidate: candidate.fullName });
+      return null;
+    }
+
+    if (res.stop_reason === 'max_tokens') {
+      log?.warn('ai fit truncated (raise max_tokens)', { candidate: candidate.fullName });
       return null;
     }
 

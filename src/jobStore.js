@@ -89,6 +89,15 @@ export function failJob(id, error) {
   persist();
 }
 
+/** Merge arbitrary fields into a job (e.g. commit results after an approval). */
+export function patchJob(id, patch) {
+  const job = jobs.get(id);
+  if (!job) return null;
+  Object.assign(job, patch);
+  persist();
+  return job;
+}
+
 export function getJob(id) {
   return jobs.get(id) || null;
 }

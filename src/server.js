@@ -10,9 +10,13 @@ import { parseForm } from './form.js';
 import { runPipeline, defaultProviders } from './pipeline.js';
 import { runPoolPipeline } from './poolPipeline.js';
 import { demoProviders } from './providers/demo.js';
-import { createJob, completeJob, failJob, getJob, listJobs } from './jobStore.js';
+import { createJob, completeJob, failJob, getJob, listJobs, patchJob } from './jobStore.js';
 import { checkAllKeys } from './keyCheck.js';
 import { loadPool, getRawPool, getRawTiers, savePool, saveTiers } from './pool.js';
+import { previewPool, previewSearch, commit } from './approval.js';
+import { listSuppression, suppress, unsuppress } from './suppression.js';
+import { contactCount, recentContacts } from './contacts.js';
+import { estimateCost } from './cost.js';
 import { requireAdmin, checkPassword, issueToken, sessionCookie, clearCookie, adminOpen } from './admin/auth.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -206,6 +210,97 @@ app.post('/admin/api/pool', (req, res) => {
 
 app.get('/admin/api/jobs', (req, res) => {
   res.json({ jobs: listJobs(Number(req.query.limit) || 25) });
+});
+
+// Full detail for one run (status + summary/error) — powers the live results view.
+app.get('/admin/api/jobs/:id', (req, res) => {
+  const job = getJob(req.params.id);
+  if (!job) return res.status(404).json({ error: 'job_not_found' });
+  res.json(job);
+});
+
+// PREVIEW a single-company search from the admin UI — discover + enrich, but send NOTHING.
+// The operator reviews candidates and commits the approved ones separately.
+app.post('/admin/api/run-search', (req, res) => {
+  const requestId = randomUUID();
+  const log = logger.child({ requestId, run: 'admin-search' });
+  const { form, errors } = parseForm(req.body || {});
+  if (errors.length) return res.status(422).json({ ok: false, errors });
+
+  createJob(requestId, form);
+  res.status(202).json({ ok: true, requestId, company: form.companyName });
+
+  log.info('admin search preview started', { company: form.companyName, titles: form.titles });
+  previewSearch(form, log, providers)
+    .then((summary) => completeJob(requestId, summary))
+    .catch((err) => {
+      log.error('admin search crashed', { error: err.message });
+      failJob(requestId, err.message);
+    });
+});
+
+// PREVIEW the whole pool-matching engine — score + match every role, but send NOTHING.
+app.post('/admin/api/run-pool', (_req, res) => {
+  const requestId = randomUUID();
+  const log = logger.child({ requestId, run: 'admin-pool' });
+
+  createJob(requestId, { companyName: 'Pool matching run', titles: [], location: '' });
+  res.status(202).json({ ok: true, requestId });
+
+  log.info('admin pool preview started', { demo: DEMO });
+  previewPool(log, providers)
+    .then((summary) => completeJob(requestId, summary))
+    .catch((err) => {
+      log.error('admin pool run crashed', { error: err.message });
+      failJob(requestId, err.message);
+    });
+});
+
+// COMMIT: create campaigns + send outreach to ONLY the approved candidates from a preview job.
+// Suppressed and recently-contacted people are skipped even if approved.
+app.post('/admin/api/commit', async (req, res) => {
+  const { requestId, approved } = req.body || {};
+  const job = getJob(requestId);
+  if (!job || !job.summary || !Array.isArray(job.summary.groups)) {
+    return res.status(404).json({ ok: false, error: 'preview not found — run a search first' });
+  }
+  if (job.commit) return res.status(409).json({ ok: false, error: 'this run was already committed' });
+  const log = logger.child({ requestId, run: 'admin-commit' });
+  try {
+    const result = await commit(job.summary, approved || [], log, providers);
+    patchJob(requestId, { commit: result });
+    res.json({ ok: true, result });
+  } catch (err) {
+    log.error('commit failed', { error: err.message });
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Suppression (do-not-contact) list management.
+app.get('/admin/api/suppression', (_req, res) => {
+  res.json({ ...listSuppression(), contactCount: contactCount(), recent: recentContacts(20) });
+});
+app.post('/admin/api/suppression', (req, res) => {
+  const { add, remove } = req.body || {};
+  if (add) suppress(add);
+  if (remove) unsuppress(remove);
+  res.json({ ok: true, ...listSuppression() });
+});
+
+// Funnel + spend rollup across recent runs.
+app.get('/admin/api/funnel', (_req, res) => {
+  const jobs = listJobs(100).filter((j) => j.summary && Array.isArray(j.summary.groups));
+  const agg = { runs: jobs.length, discovered: 0, enriched: 0, matched: 0, sent: 0, cost: 0 };
+  for (const j of jobs) {
+    const s = j.summary;
+    agg.discovered += s.discovered || 0;
+    agg.enriched += s.enriched || 0;
+    agg.matched += s.matched || 0;
+    agg.sent += j.commit?.sent || 0;
+    agg.cost += (s.cost?.total) ?? estimateCost(s).total;
+  }
+  agg.cost = Math.round(agg.cost * 100) / 100;
+  res.json(agg);
 });
 
 // Readiness snapshot for the status panel.

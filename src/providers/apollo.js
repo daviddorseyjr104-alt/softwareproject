@@ -42,7 +42,10 @@ export async function discoverCandidates({ titles, location, limit }, log) {
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
-        Authorization: `Bearer ${config.apollo.apiKey}`,
+        // Apollo authenticates via the X-Api-Key header (NOT Bearer). This was previously
+        // `Authorization: Bearer` here while keyCheck.js used x-api-key — the two disagreed,
+        // so "Test keys" could pass while real searches 401'd. Aligned to the documented header.
+        'x-api-key': config.apollo.apiKey,
       },
       body: JSON.stringify(body),
       log,
