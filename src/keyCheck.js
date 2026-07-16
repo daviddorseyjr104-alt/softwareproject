@@ -70,16 +70,25 @@ export async function checkAnthropicKey(apiKey) {
   return verdict(res);
 }
 
+export async function checkGithubKey(apiKey) {
+  if (!apiKey) return { ...unset, detail: 'not set (optional — works unauthenticated at a lower rate limit)' };
+  const res = await call('https://api.github.com/user', {
+    headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/vnd.github+json', 'User-Agent': 'candidate-finder' },
+  });
+  return verdict(res);
+}
+
 /**
  * @param {{apollo?:string, salesql?:string, instantly?:string, anthropic?:string}} keys
  * @returns {Promise<{apollo,salesql,instantly,anthropic}>} each an { ok, status, detail }
  */
 export async function checkAllKeys(keys = {}) {
-  const [apollo, salesql, instantly, anthropic] = await Promise.all([
+  const [apollo, salesql, instantly, anthropic, github] = await Promise.all([
     checkApolloKey(keys.apollo),
     checkSalesqlKey(keys.salesql),
     checkInstantlyKey(keys.instantly),
     checkAnthropicKey(keys.anthropic),
+    checkGithubKey(keys.github),
   ]);
-  return { apollo, salesql, instantly, anthropic };
+  return { apollo, salesql, instantly, anthropic, github };
 }

@@ -7,10 +7,12 @@ import { getSettings } from './settings.js';
 import { discoverCandidates } from './providers/apollo.js';
 import { enrichCandidates } from './providers/salesql.js';
 import { createCampaign, addLeads, activateCampaign } from './providers/instantly.js';
+import { enrichGithub } from './providers/github.js';
 
 export const defaultProviders = {
   discoverCandidates,
   enrichCandidates,
+  enrichGithub,
   createCampaign,
   addLeads,
   activateCampaign,

@@ -46,6 +46,27 @@ export const demoProviders = {
     return enriched;
   },
 
+  // Deterministic fake GitHub profile so DEMO shows real-looking engineering signal.
+  async enrichGithub(candidate, log) {
+    const langs = (candidate.headline || '').match(/\b(Go|Python|React|TypeScript|JavaScript|Kubernetes|Java|Rust|Node\.js|GraphQL|Terraform)\b/g) || [];
+    if (!langs.length) return null; // no signal → no match (mirrors the real provider)
+    const seed = (candidate.firstName || 'x').charCodeAt(0);
+    const gh = {
+      matched: true,
+      confidence: seed % 3 === 0 ? 'high' : 'medium',
+      url: `https://github.com/demo-${(candidate.firstName || 'dev').toLowerCase()}`,
+      login: `demo-${(candidate.firstName || 'dev').toLowerCase()}`,
+      name: candidate.fullName || '',
+      company: candidate.company || '',
+      publicRepos: 8 + (seed % 40),
+      followers: 12 + (seed % 300),
+      stars: 30 + (seed % 900),
+      topLanguages: [...new Set(langs)].slice(0, 5),
+    };
+    log.info('[DEMO] github matched', { login: gh.login, langs: gh.topLanguages });
+    return gh;
+  },
+
   async createCampaign(companyName, log) {
     const id = `demo-campaign-${slug(companyName)}`;
     const name = `${companyName} – Candidate Outreach`;

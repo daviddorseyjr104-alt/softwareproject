@@ -114,6 +114,13 @@
   .chip { font-size: .72rem; padding: .2rem .55rem; border-radius: 999px; border: 1px solid; }
   .chip.hit { background: rgba(52,211,153,.1); border-color: rgba(52,211,153,.3); color: #6ee7b7; }
   .chip.miss { background: rgba(148,163,184,.06); border-color: var(--line); color: var(--faint); text-decoration: line-through; }
+  .chip.lang { background: rgba(139,92,246,.12); border-color: rgba(139,92,246,.32); color: #c4b5fd; }
+  .gh { background: rgba(139,92,246,.05); border: 1px solid rgba(139,92,246,.2); border-radius: 10px; padding: .55rem .7rem; margin: .4rem 0; }
+  .gh-head { display: flex; align-items: center; gap: .5rem; font-size: .85rem; }
+  .gh-head a { color: #c4b5fd; text-decoration: none; font-weight: 600; } .gh-head a:hover { text-decoration: underline; }
+  .gh-conf { background: rgba(139,92,246,.18); color: #ddd6fe; border: 1px solid rgba(139,92,246,.35); }
+  .gh-stats { font-size: .8rem; color: var(--muted); margin-top: .25rem; } .gh-stats b { color: var(--text); }
+  .gh-flag { font-size: .72rem; }
   .bars { display: grid; gap: .3rem; margin-top: .45rem; max-width: 340px; }
   .bar { display: grid; grid-template-columns: 74px 1fr 30px; align-items: center; gap: .5rem; font-size: .72rem; color: var(--muted); }
   .bar .track { height: 6px; background: rgba(148,163,184,.14); border-radius: 999px; overflow: hidden; }
@@ -240,6 +247,9 @@
         <div><label>Auto-source every N hours (0 = off)</label><input id="scheduleHours" type="number"></div>
         <div><label>Re-contact guard (days; 0 = off)</label><input id="dedupeWindowDays" type="number"></div>
       </div>
+      <div class="row">
+        <div><label>GitHub deep-profile enrichment</label><select id="enrichGithub"><option value="true">on — read real repos/languages/stars</option><option value="false">off</option></select></div>
+      </div>
       <div class="row4">
         <div><label>Weight: AI</label><input id="weightAi" type="number" step="0.05"></div>
         <div><label>Weight: skills</label><input id="weightSkills" type="number" step="0.05"></div>
@@ -306,7 +316,7 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
-const KEY_SERVICES = [['apollo','Apollo'],['salesql','SalesQL'],['instantly','Instantly'],['anthropic','Anthropic (opt)']];
+const KEY_SERVICES = [['apollo','Apollo'],['salesql','SalesQL'],['instantly','Instantly'],['anthropic','Anthropic (opt)'],['github','GitHub (opt)']];
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 async function api(path, opts) {
   const res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...opts });
@@ -384,6 +394,14 @@ function candCard(c) {
       ${(c.ai.strengths||[]).length ? `<span class="sr"><b>+ Strengths:</b> ${esc((c.ai.strengths||[]).join('; '))}</span>` : ''}
       ${(c.ai.concerns||[]).length ? `<span class="sr cn"><b>– Concerns:</b> ${esc((c.ai.concerns||[]).join('; '))}</span>` : ''}</div>`;
   }
+  if (c.github && c.github.matched) {
+    const g = c.github;
+    detail += `<div class="gh">
+      <div class="gh-head">🐙 <a href="${esc(g.url)}" target="_blank" rel="noopener">${esc(g.login)}</a>
+        <span class="badge gh-conf">${esc(g.confidence)} match</span></div>
+      <div class="gh-stats"><b>${g.publicRepos}</b> repos · <b>${g.stars}</b> stars · <b>${g.followers}</b> followers</div>
+      <div class="chips">${chips(g.topLanguages, 'lang')}</div></div>`;
+  }
   if (b.matchedSkills || b.missingSkills) {
     detail += `<div class="chips">${chips(b.matchedSkills, 'hit')}${chips(b.missingSkills, 'miss')}</div>`;
   }
@@ -396,7 +414,7 @@ function candCard(c) {
     <div class="cand-row" onclick="toggleCand(this)">
       <input type="checkbox" class="chk" ${blocked ? 'disabled' : 'checked'} onclick="event.stopPropagation();updateApproveCount()">
       <div class="av">${esc(initials(c.name))}</div>
-      <div class="meta"><div class="nm">${esc(c.name)} ${badge}</div>
+      <div class="meta"><div class="nm">${esc(c.name)} ${c.github && c.github.matched ? '<span class="gh-flag" title="GitHub matched">🐙</span>' : ''} ${badge}</div>
         <div class="rl">${esc(c.role || '')}${c.company ? ' · ' + esc(c.company) : ''}</div>
         <div class="em">${esc(c.email)}</div></div>
       ${scoreHtml}<div class="caret">▸</div>
@@ -513,7 +531,7 @@ async function loadImpl() {
   renderKeys(s.keys); const v = s.values;
   for (const id of ['maxCandidates','discoverLimit','scheduleHours','scoreThreshold','aiEffort','weightAi','weightSkills','weightSeniority','weightPedigree','instantlyTimezone','instantlySendingFrom','instantlySendingTo','instantlyTemplateCampaignId','dedupeWindowDays'])
     if ($(id) != null) $(id).value = v[id] ?? '';
-  $('personalOnly').value = String(v.personalOnly); $('dryRun').value = String(v.dryRun);
+  $('personalOnly').value = String(v.personalOnly); $('dryRun').value = String(v.dryRun); $('enrichGithub').value = String(v.enrichGithub);
   $('seniorities').value = (v.seniorities || []).join(', '); $('testCompanyNames').value = (v.testCompanyNames || []).join(', ');
   const pool = await api('/admin/api/pool');
   $('companies').value = JSON.stringify(pool.companies, null, 2); $('tiers').value = JSON.stringify(pool.tiers, null, 2);
@@ -555,7 +573,7 @@ async function saveSettings() {
     weightAi: num('weightAi'), weightSkills: num('weightSkills'), weightSeniority: num('weightSeniority'), weightPedigree: num('weightPedigree'),
     instantlyTimezone: $('instantlyTimezone').value, instantlySendingFrom: $('instantlySendingFrom').value, instantlySendingTo: $('instantlySendingTo').value,
     instantlyTemplateCampaignId: $('instantlyTemplateCampaignId').value, dedupeWindowDays: num('dedupeWindowDays'),
-    personalOnly: $('personalOnly').value === 'true', dryRun: $('dryRun').value === 'true',
+    personalOnly: $('personalOnly').value === 'true', dryRun: $('dryRun').value === 'true', enrichGithub: $('enrichGithub').value === 'true',
     seniorities: $('seniorities').value.split(',').map(s => s.trim()).filter(Boolean),
     testCompanyNames: $('testCompanyNames').value.split(',').map(s => s.trim()).filter(Boolean) };
   const r = await api('/admin/api/settings', { method: 'POST', body: JSON.stringify(patch) });

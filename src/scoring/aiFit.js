@@ -107,9 +107,19 @@ function buildPrompt(candidate, role) {
     `Location: ${candidate.location || ''}`,
     `Headline: ${candidate.headline || 'n/a'}`,
     `LinkedIn: ${candidate.linkedinUrl || 'n/a'}`,
+    githubBlock(candidate.github),
     '',
-    'Judge overall fit for THIS role and return the structured verdict.',
+    'Judge overall fit for THIS role and return the structured verdict. Weight real, verifiable',
+    'engineering evidence (GitHub activity, languages actually shipped, stars) above self-reported',
+    'titles when both are present.',
   ].join('\n');
+}
+
+function githubBlock(gh) {
+  if (!gh || !gh.matched) return 'GitHub: not found (no verifiable code signal)';
+  const langs = (gh.topLanguages || []).join(', ') || 'n/a';
+  return `GitHub (${gh.confidence} confidence): ${gh.url} — ${gh.publicRepos} public repos, ` +
+    `${gh.stars} stars, ${gh.followers} followers; ships in: ${langs}`;
 }
 
 function clamp(n) {

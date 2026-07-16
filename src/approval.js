@@ -9,6 +9,7 @@ import { loadPool, loadCompanyTiers } from './pool.js';
 import { matchCandidates, groupByCompany, preRank } from './matcher.js';
 import { defaultProviders } from './pipeline.js';
 import { dedupeByEmail } from './pipeline.js';
+import { mapLimit } from './http.js';
 import { isSuppressed } from './suppression.js';
 import { lastContactAgeDays, recentlyContacted, recordContacts } from './contacts.js';
 import { estimateCost } from './cost.js';
@@ -61,6 +62,9 @@ export async function previewPool(log, providers = defaultProviders) {
   summary.enriched = enriched.length;
   if (!enriched.length) { summary.status = 'no_emails'; return finishPreview(summary); }
 
+  // [3b] Deep-profile: attach real GitHub engineering signal so scoring judges work, not titles.
+  summary.githubMatched = await attachGithub(enriched, p, log);
+
   const { matches, aiUsed } = await matchCandidates(enriched, roles, tierMap, log);
   summary.aiUsed = aiUsed;
   summary.matched = matches.length;
@@ -96,6 +100,7 @@ export async function previewSearch(form, log, providers = defaultProviders) {
   summary.enriched = enriched.length;
   summary.matched = enriched.length;
   if (!enriched.length) { summary.status = 'no_emails'; return finishPreview(summary); }
+  summary.githubMatched = await attachGithub(enriched, p, log);
 
   summary.groups.push({
     company: form.companyName,
@@ -170,6 +175,20 @@ export async function commit(summary, approvedEmails, log, providers = defaultPr
 }
 
 // ─── helpers ────────────────────────────────────────────────────────
+// Best-effort GitHub enrichment over the finalists (bounded concurrency). Mutates each
+// candidate with `.github` and returns how many were confidently matched.
+async function attachGithub(candidates, p, log) {
+  if (typeof p.enrichGithub !== 'function') return 0;
+  let matched = 0;
+  await mapLimit(candidates, 3, async (c) => {
+    try {
+      const gh = await p.enrichGithub(c, log);
+      if (gh) { c.github = gh; matched++; }
+    } catch { /* never let GitHub sink a run */ }
+  });
+  return matched;
+}
+
 function dedupeWindow() {
   const n = Number(getSettings().dedupeWindowDays);
   return Number.isFinite(n) ? n : 0; // 0 = cross-run dedup off (default)
@@ -188,6 +207,7 @@ function candidateFromMatch(m, company, roleTitle, roleSalary) {
     linkedinUrl: c.linkedinUrl,
     breakdown: m.breakdown,
     ai: m.ai,
+    github: c.github || null,
     _lead: leadOf(c, roleTitle, roleSalary),
   };
 }
@@ -204,6 +224,7 @@ function candidateFromEnriched(c, company, roleTitle, roleSalary) {
     linkedinUrl: c.linkedinUrl,
     breakdown: null,
     ai: null,
+    github: c.github || null,
     _lead: leadOf(c, roleTitle, roleSalary),
   };
 }

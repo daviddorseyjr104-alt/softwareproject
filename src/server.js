@@ -185,6 +185,7 @@ app.post('/admin/api/test-keys', async (req, res) => {
     salesql: b.salesql || s.salesql.apiKey,
     instantly: b.instantly || s.instantly.apiKey,
     anthropic: b.anthropic || s.ai.apiKey,
+    github: b.github || s.github.apiKey,
   });
   res.json(results);
 });

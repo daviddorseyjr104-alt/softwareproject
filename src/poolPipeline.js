@@ -8,6 +8,7 @@
 import { getSettings } from './settings.js';
 import { loadPool, loadCompanyTiers } from './pool.js';
 import { matchCandidates, groupByCompany, preRank } from './matcher.js';
+import { mapLimit } from './http.js';
 import { defaultProviders } from './pipeline.js';
 
 export async function runPoolPipeline(log, providers = defaultProviders) {
@@ -59,6 +60,13 @@ export async function runPoolPipeline(log, providers = defaultProviders) {
   // [3] Enrich ONLY the finalists (the paid step). Drop anyone we can't reach.
   const enriched = (await p.enrichCandidates(finalists, log)).filter((c) => c.email);
   summary.enriched = enriched.length;
+
+  // [3b] Attach real GitHub engineering signal (best-effort) before scoring.
+  if (typeof p.enrichGithub === 'function') {
+    await mapLimit(enriched, 3, async (c) => {
+      try { const gh = await p.enrichGithub(c, log); if (gh) c.github = gh; } catch { /* best-effort */ }
+    });
+  }
   if (enriched.length === 0) {
     summary.status = 'no_emails';
     summary.durationMs = Date.now() - startedAt;

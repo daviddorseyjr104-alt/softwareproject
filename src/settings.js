@@ -11,7 +11,7 @@ import { join } from 'node:path';
 import { bootConfig } from './config.js';
 
 const SETTINGS_FILE = join(bootConfig.dataDir, 'settings.json');
-const SECRET_FIELDS = ['apollo', 'salesql', 'instantly', 'anthropic'];
+const SECRET_FIELDS = ['apollo', 'salesql', 'instantly', 'anthropic', 'github'];
 
 // ---- helpers -------------------------------------------------------------
 const bool = (v, d = false) =>
@@ -113,6 +113,10 @@ function build() {
       apiKey: secret('anthropic', 'ANTHROPIC_API_KEY'),
       effort: v.aiEffort ?? process.env.AI_EFFORT ?? 'low',
     },
+    github: {
+      apiKey: secret('github', 'GITHUB_TOKEN'), // optional — lifts the rate limit
+      enrich: bool(v.enrichGithub ?? process.env.ENRICH_GITHUB, true), // pull real GitHub signal
+    },
     scoring: {
       threshold: int(v.scoreThreshold ?? process.env.SCORE_THRESHOLD, 60),
       weights: {
@@ -156,6 +160,7 @@ export function updateSettings(patch = {}) {
     salesqlApiKey: 'salesql',
     instantlyApiKey: 'instantly',
     anthropicApiKey: 'anthropic',
+    githubApiKey: 'github',
   };
 
   for (const [patchKey, field] of Object.entries(secretMap)) {
@@ -187,6 +192,7 @@ export function getMaskedSettings() {
       salesql: mask(s.salesql.apiKey),
       instantly: mask(s.instantly.apiKey),
       anthropic: mask(s.ai.apiKey),
+      github: mask(s.github.apiKey),
     },
     values: {
       maxCandidates: s.apollo.maxCandidates,
@@ -207,6 +213,7 @@ export function getMaskedSettings() {
       dryRun: s.dryRun,
       testCompanyNames: s.testCompanyNames,
       dedupeWindowDays: s.dedupeWindowDays,
+      enrichGithub: s.github.enrich,
     },
     encryptionEnabled: Boolean(bootConfig.secretKey),
   };
