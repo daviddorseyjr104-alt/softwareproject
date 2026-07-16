@@ -11,3 +11,6 @@ data/settings.json
 data/jobs.json
 data/companies.json
 data/company-tiers.json
+# Contains real contacted emails (audit trail) and do-not-contact entries — PII, never commit.
+data/contacts.json
+data/suppression.json

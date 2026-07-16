@@ -8,6 +8,7 @@ import { discoverCandidates } from './providers/apollo.js';
 import { enrichCandidates } from './providers/salesql.js';
 import { createCampaign, addLeads, activateCampaign } from './providers/instantly.js';
 import { enrichGithub } from './providers/github.js';
+import { isSuppressed } from './suppression.js';
 
 export const defaultProviders = {
   discoverCandidates,
@@ -60,9 +61,10 @@ export async function runPipeline(form, log, providers = defaultProviders) {
     return summary;
   }
 
-  // [2] Enrichment (personal emails)
+  // [2] Enrichment (personal emails). Drop dupes AND anyone on the do-not-contact list —
+  // suppression must apply to the automated webhook path, not just the admin approval flow.
   const enriched = await p.enrichCandidates(discovered, log);
-  const deduped = dedupeByEmail(enriched);
+  const deduped = dedupeByEmail(enriched).filter((c) => !isSuppressed(c.email));
   summary.enriched = deduped.length;
 
   // Per blueprint: if no qualified candidates with email, finish WITHOUT creating a campaign.

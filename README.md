@@ -30,16 +30,32 @@ single-file change: [`src/providers/apollo.js`](src/providers/apollo.js).
 
 **2. Multi-company matching engine** (`npm run match`) — the real talent-matching brain. You maintain a pool of companies + open roles ([data/companies.json](data/companies.json)); the engine discovers candidates for every role, **scores each candidate** on four signals, **matches** each to their best-fit company, and creates one campaign per company with only the top matches.
 
+### How candidates are found (best-first, spend-smart)
+
+The engine casts a **wide net** (`DISCOVER_LIMIT`, ~100/role), **pre-ranks the whole pool for free** on the deterministic signals, keeps the **top finalists** (`MAX_CANDIDATES`), and enriches **only those** — so paid SalesQL credits go to the best candidates, not to everyone Apollo returned.
+
 ### How candidates are scored (0–100 composite)
 
 | Signal | Weight | How |
 |---|---|---|
-| **AI fit** | 0.40 | Claude (`claude-opus-4-8`) reads the candidate vs. the role and returns a fit score + reasoning. **Optional** — needs `ANTHROPIC_API_KEY`; if absent, the composite reweights to the other three. |
+| **AI fit** | 0.40 | Claude (`claude-opus-4-8`) reads the candidate vs. the role — including **real GitHub evidence** (repos, stars, languages) when found — and returns a fit score + reasoning. **Optional** — needs `ANTHROPIC_API_KEY`; if absent, the composite reweights to the other three. |
 | **Skills match** | 0.25 | Role's required/nice-to-have skills matched against the candidate's title + headline |
 | **Seniority** | 0.20 | Candidate's level vs. the role's desired seniority |
 | **Pedigree** | 0.15 | Candidate's current employer looked up in [data/company-tiers.json](data/company-tiers.json) (tier 1 = elite) |
 
+**Deep-profile enrichment:** finalists are matched to their real **GitHub** profile (`src/providers/github.js`) so "best" reflects shipped code, not a job title. Best-effort and optional — `GITHUB_TOKEN` lifts the rate limit but isn't required.
+
 Weights and the accept `SCORE_THRESHOLD` are configurable in `.env`. Only candidates ≥ threshold are matched, and each role has a `capacity` cap — the highest scores claim the seats.
+
+### The admin console: preview → approve → send
+
+The `/admin` UI is a review console, not a fire-and-forget button:
+
+1. **Preview** — run a single-company search or match the whole pool. It discovers, scores, and enriches, but **sends nothing**.
+2. **Review** — every candidate is a card with the AI's reasoning, matched/missing skills, score breakdown, and GitHub signal. Suppressed or recently-contacted people are flagged and auto-excluded.
+3. **Approve & launch** — check the ones you want, hit **Launch** — only then are campaigns created and outreach sent.
+
+Built-in guardrails: a **do-not-contact list** (emails or whole domains), **cross-run dedup** (`DEDUPE_WINDOW_DAYS`), an **immutable contact audit trail**, per-run **cost estimates**, a lifetime **funnel**, and optional **scheduled sourcing** (`SCHEDULE_HOURS`) that generates previews for review without ever auto-sending.
 
 ### Run the matcher
 
