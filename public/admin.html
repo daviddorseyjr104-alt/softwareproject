@@ -231,9 +231,14 @@
     <div class="card">
       <div class="card-head"><div class="ico">⚙️</div><h2>Behaviour &amp; scoring</h2></div>
       <div class="row3">
-        <div><label>Max candidates / role</label><input id="maxCandidates" type="number"></div>
+        <div><label>Discover per role (wide net)</label><input id="discoverLimit" type="number"></div>
+        <div><label>Enrich top N (finalists — paid)</label><input id="maxCandidates" type="number"></div>
         <div><label>Score threshold (0–100)</label><input id="scoreThreshold" type="number"></div>
+      </div>
+      <div class="row3">
         <div><label>AI effort</label><select id="aiEffort"><option>low</option><option>medium</option><option>high</option><option>xhigh</option><option>max</option></select></div>
+        <div><label>Auto-source every N hours (0 = off)</label><input id="scheduleHours" type="number"></div>
+        <div><label>Re-contact guard (days; 0 = off)</label><input id="dedupeWindowDays" type="number"></div>
       </div>
       <div class="row4">
         <div><label>Weight: AI</label><input id="weightAi" type="number" step="0.05"></div>
@@ -246,10 +251,9 @@
         <div><label>Send from</label><input id="instantlySendingFrom" placeholder="09:00"></div>
         <div><label>Send to</label><input id="instantlySendingTo" placeholder="17:00"></div>
       </div>
-      <div class="row3">
+      <div class="row">
         <div><label>Instantly template campaign id (optional)</label><input id="instantlyTemplateCampaignId"></div>
         <div><label>Test company names (comma-sep — force dry-run)</label><input id="testCompanyNames"></div>
-        <div><label>Re-contact guard (days; 0 = off)</label><input id="dedupeWindowDays" type="number"></div>
       </div>
       <div class="row3">
         <div><label>Personal emails only</label><select id="personalOnly"><option value="true">true</option><option value="false">false</option></select></div>
@@ -408,12 +412,17 @@ function renderApproval(job) {
   $('results-sub').textContent = s.cost ? `est. $${s.cost.total.toFixed(2)}` : '';
   const [cls, msg] = STATUS_BANNER[s.status] || ['info', s.status || 'Done.'];
   let html = `<div class="banner ${cls}">${msg}</div>`;
+  const preTile = (s.kind === 'pool' && s.prescreened != null)
+    ? `<div class="stat"><div class="n">${s.prescreened}</div><div class="l">top finalists</div></div>` : '';
   html += `<div class="stats">
     <div class="stat"><div class="n">${s.discovered ?? 0}</div><div class="l">discovered</div></div>
+    ${preTile}
     <div class="stat"><div class="n">${s.enriched ?? 0}</div><div class="l">with email</div></div>
     <div class="stat"><div class="n">${s.matched ?? 0}</div><div class="l">${s.kind === 'pool' ? 'matched' : 'usable'}</div></div>
     <div class="stat money"><div class="n">$${(s.cost?.total ?? 0).toFixed(2)}</div><div class="l">est. cost</div></div>
   </div>`;
+  if (s.kind === 'pool' && s.prescreened != null && s.discovered > s.prescreened)
+    html += `<p class="hint" style="margin:-.4rem 0 .6rem">Discovered ${s.discovered}, pre-ranked to the top ${s.prescreened} finalists, and enriched only those — so credits go to the best candidates.</p>`;
   if (s.aiUsed === false && s.kind === 'pool') html += `<p class="hint" style="margin:-.4rem 0 .6rem">AI fit scoring is off (no Anthropic key) — scores use skills/seniority/pedigree only.</p>`;
 
   const groups = s.groups || [];
@@ -502,7 +511,7 @@ async function load() { try { await loadImpl(); } catch (e) { if (e.message !== 
 async function loadImpl() {
   const s = await api('/admin/api/settings');
   renderKeys(s.keys); const v = s.values;
-  for (const id of ['maxCandidates','scoreThreshold','aiEffort','weightAi','weightSkills','weightSeniority','weightPedigree','instantlyTimezone','instantlySendingFrom','instantlySendingTo','instantlyTemplateCampaignId','dedupeWindowDays'])
+  for (const id of ['maxCandidates','discoverLimit','scheduleHours','scoreThreshold','aiEffort','weightAi','weightSkills','weightSeniority','weightPedigree','instantlyTimezone','instantlySendingFrom','instantlySendingTo','instantlyTemplateCampaignId','dedupeWindowDays'])
     if ($(id) != null) $(id).value = v[id] ?? '';
   $('personalOnly').value = String(v.personalOnly); $('dryRun').value = String(v.dryRun);
   $('seniorities').value = (v.seniorities || []).join(', '); $('testCompanyNames').value = (v.testCompanyNames || []).join(', ');
@@ -542,7 +551,7 @@ async function testKeys() {
 }
 async function saveSettings() {
   const num = (id) => { const n = parseFloat($(id).value); return Number.isFinite(n) ? n : undefined; };
-  const patch = { maxCandidates: num('maxCandidates'), scoreThreshold: num('scoreThreshold'), aiEffort: $('aiEffort').value,
+  const patch = { maxCandidates: num('maxCandidates'), discoverLimit: num('discoverLimit'), scheduleHours: num('scheduleHours'), scoreThreshold: num('scoreThreshold'), aiEffort: $('aiEffort').value,
     weightAi: num('weightAi'), weightSkills: num('weightSkills'), weightSeniority: num('weightSeniority'), weightPedigree: num('weightPedigree'),
     instantlyTimezone: $('instantlyTimezone').value, instantlySendingFrom: $('instantlySendingFrom').value, instantlySendingTo: $('instantlySendingTo').value,
     instantlyTemplateCampaignId: $('instantlyTemplateCampaignId').value, dedupeWindowDays: num('dedupeWindowDays'),

@@ -77,6 +77,9 @@ function normalize(person) {
     title: person.title || '',
     company: org.name || person.organization_name || '',
     linkedinUrl: person.linkedin_url || '',
+    // Headline feeds skills-matching and the AI fit score — dropping it starved both
+    // signals, leaving them to judge candidates on job title alone.
+    headline: person.headline || person.title || '',
     location: [person.city, person.state, person.country].filter(Boolean).join(', '),
   };
 }

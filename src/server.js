@@ -353,6 +353,24 @@ const server = app.listen(bootConfig.port, () => {
   }
 });
 
+// --- Automated sourcing: re-run the pool PREVIEW on a cadence (never auto-sends) ---
+// Every firing produces a preview job the operator reviews and approves in the Approval Room.
+let lastScheduledRun = Date.now(); // wait one full interval before the first run
+const scheduler = setInterval(() => {
+  const hours = getSettings().scheduleHours;
+  if (!hours || hours <= 0) return;
+  if (Date.now() - lastScheduledRun < hours * 3600 * 1000) return;
+  lastScheduledRun = Date.now();
+  const requestId = randomUUID();
+  const log = logger.child({ requestId, run: 'scheduled' });
+  createJob(requestId, { companyName: 'Scheduled pool preview', titles: [], location: '' });
+  log.info('scheduled pool preview started', { everyHours: hours });
+  previewPool(log, providers)
+    .then((summary) => completeJob(requestId, summary))
+    .catch((err) => failJob(requestId, err.message));
+}, 60 * 1000);
+scheduler.unref(); // don't keep the process alive just for the scheduler
+
 // Graceful shutdown
 for (const sig of ['SIGINT', 'SIGTERM']) {
   process.on(sig, () => {

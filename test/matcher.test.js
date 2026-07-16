@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { matchCandidates, groupByCompany } from '../src/matcher.js';
+import { matchCandidates, groupByCompany, preRank } from '../src/matcher.js';
 import { logger } from '../src/logger.js';
 
 const quietLog = logger.child({ test: true });
@@ -21,6 +21,18 @@ const roles = [
     location: 'LA', capacity: 5, company: { id: 'c2', name: 'Co2', tier: 2 },
   },
 ];
+
+test('preRank orders a wide pool best-first on deterministic signals alone (no email needed)', () => {
+  const pool = [
+    { fullName: 'Weak Match', title: 'Marketing Manager', company: 'Unknown Co', headline: 'brand campaigns' },
+    { fullName: 'Strong Match', title: 'Senior Backend Engineer', company: 'Stripe', headline: 'Go Kubernetes microservices at scale' },
+    { fullName: 'Mid Match', title: 'Frontend Engineer', company: 'Airbnb', headline: 'React TypeScript' },
+  ];
+  const ranked = preRank(pool, roles, tierMap);
+  assert.equal(ranked.length, 3);
+  assert.equal(ranked[0].candidate.fullName, 'Strong Match'); // best deterministic score first
+  assert.ok(ranked[0].det.overall >= ranked[2].det.overall);
+});
 
 test('matches candidates to their best-fit role', async () => {
   const candidates = [

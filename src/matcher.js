@@ -89,6 +89,26 @@ export async function matchCandidates(candidates, roles, tierMap, log) {
   return { matches, unmatched: [...belowThreshold, ...overflow], aiUsed };
 }
 
+/**
+ * Cheap deterministic pre-rank of a WIDE candidate pool BEFORE enrichment — so we spend
+ * SalesQL credits only on the most promising people, not on everyone Apollo returned.
+ * Uses title/headline/company only (no email needed). Returns candidates sorted best-first.
+ * @returns {Array<{candidate:object, det:object}>}
+ */
+export function preRank(candidates, roles, tierMap) {
+  return candidates
+    .map((candidate) => {
+      let best = null;
+      for (const role of roles) {
+        const det = deterministicScore(candidate, role, tierMap);
+        if (!best || det.overall > best.overall) best = det;
+      }
+      return { candidate, det: best };
+    })
+    .filter((x) => x.det)
+    .sort((a, b) => b.det.overall - a.det.overall);
+}
+
 /** Group matches by company for campaign creation. */
 export function groupByCompany(matches) {
   const byCompany = new Map();

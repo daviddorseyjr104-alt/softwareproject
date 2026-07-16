@@ -86,3 +86,22 @@ test('previewPool matches against the pool and surfaces scores', async () => {
     assert.equal(typeof c.score, 'number');
   }
 });
+
+test('previewPool enriches ONLY the top finalists, not the whole wide net', async () => {
+  // 30 discovered per role, but only the top `maxCandidates` should ever be enriched.
+  settings.updateSettings({ discoverLimit: 30, maxCandidates: 5 });
+  const wide = Array.from({ length: 30 }, (_, i) => ({
+    firstName: 'C' + i, lastName: 'X', fullName: 'C' + i + ' X', title: 'Senior Backend Engineer',
+    company: 'Acme', headline: 'Go Kubernetes PostgreSQL AWS microservices', linkedinUrl: 'lk-' + i, location: 'NY',
+  }));
+  let enrichedCount = 0;
+  const prov = providers({
+    discoverCandidates: async () => wide,
+    enrichCandidates: async (cs) => { enrichedCount = cs.length; return cs.map((c) => ({ ...c, email: c.linkedinUrl + '@x.com', emailType: 'personal' })); },
+  });
+  const s = await previewPool(quiet, prov);
+  assert.equal(s.discovered, 30);
+  assert.equal(s.prescreened, 5);
+  assert.equal(enrichedCount, 5); // only the 5 finalists were enriched (paid step bounded)
+  settings.updateSettings({ discoverLimit: 100, maxCandidates: 25 });
+});

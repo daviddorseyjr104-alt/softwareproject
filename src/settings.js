@@ -92,7 +92,10 @@ function build() {
   return {
     apollo: {
       apiKey: secret('apollo', 'APOLLO_API_KEY'),
+      // How many FINALISTS to enrich (the paid step) — the top N after deterministic pre-ranking.
       maxCandidates: int(v.maxCandidates ?? process.env.MAX_CANDIDATES, 25),
+      // How many to DISCOVER per role (the cheap, wide net we pre-rank down from). >= maxCandidates.
+      discoverLimit: int(v.discoverLimit ?? process.env.DISCOVER_LIMIT, 100),
       seniorities: list(v.seniorities ?? process.env.APOLLO_SENIORITIES),
     },
     salesql: {
@@ -123,6 +126,8 @@ function build() {
     testCompanyNames: list(v.testCompanyNames ?? process.env.TEST_COMPANY_NAMES).map((s) => s.toLowerCase()),
     // Cross-run dedup: don't re-email anyone contacted within this many days (0 = off).
     dedupeWindowDays: int(v.dedupeWindowDays ?? process.env.DEDUPE_WINDOW_DAYS, 0),
+    // Automated sourcing: re-run the pool preview every N hours (0 = off). Never auto-sends.
+    scheduleHours: int(v.scheduleHours ?? process.env.SCHEDULE_HOURS, 0),
   };
 }
 
@@ -185,6 +190,8 @@ export function getMaskedSettings() {
     },
     values: {
       maxCandidates: s.apollo.maxCandidates,
+      discoverLimit: s.apollo.discoverLimit,
+      scheduleHours: s.scheduleHours,
       seniorities: s.apollo.seniorities,
       personalOnly: s.salesql.personalOnly,
       instantlyTimezone: s.instantly.timezone,

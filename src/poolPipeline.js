@@ -7,7 +7,7 @@
 // the demo fakes, or test mocks.
 import { getSettings } from './settings.js';
 import { loadPool, loadCompanyTiers } from './pool.js';
-import { matchCandidates, groupByCompany } from './matcher.js';
+import { matchCandidates, groupByCompany, preRank } from './matcher.js';
 import { defaultProviders } from './pipeline.js';
 
 export async function runPoolPipeline(log, providers = defaultProviders) {
@@ -30,11 +30,11 @@ export async function runPoolPipeline(log, providers = defaultProviders) {
     status: 'ok',
   };
 
-  // [1] Discover candidates for every role, then merge + dedupe by LinkedIn URL.
+  // [1] Discover a WIDE net for every role, then merge + dedupe by LinkedIn URL.
   const byLinkedin = new Map();
   for (const role of roles) {
     const found = await p.discoverCandidates(
-      { titles: role.searchTitles, location: role.location, limit: config.apollo.maxCandidates },
+      { titles: role.searchTitles, location: role.location, limit: config.apollo.discoverLimit },
       log,
     );
     for (const c of found) {
@@ -51,8 +51,13 @@ export async function runPoolPipeline(log, providers = defaultProviders) {
     return summary;
   }
 
-  // [2] Enrich (personal emails). Drop anyone we can't reach.
-  const enriched = (await p.enrichCandidates(discovered, log)).filter((c) => c.email);
+  // [2] Pre-rank the wide pool (free) and keep the top finalists — enrich only the best.
+  const finalists = preRank(discovered, roles, tierMap).slice(0, config.apollo.maxCandidates).map((x) => x.candidate);
+  summary.prescreened = finalists.length;
+  summary.enrichAttempts = finalists.length;
+
+  // [3] Enrich ONLY the finalists (the paid step). Drop anyone we can't reach.
+  const enriched = (await p.enrichCandidates(finalists, log)).filter((c) => c.email);
   summary.enriched = enriched.length;
   if (enriched.length === 0) {
     summary.status = 'no_emails';

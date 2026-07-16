@@ -21,8 +21,9 @@ const round = (n) => Math.round(n * 100) / 100;
 export function estimateCost(summary = {}, prices = {}) {
   const p = { ...DEFAULT_PRICES, ...prices };
 
-  // SalesQL is charged per enrichment ATTEMPT, i.e. once per discovered candidate — not per email found.
-  const lookups = summary.discovered ?? summary.enriched ?? 0;
+  // SalesQL is charged per enrichment ATTEMPT — now only the top finalists we chose to enrich,
+  // not the whole wide discovery net. Falls back to discovered for older summaries.
+  const lookups = summary.enrichAttempts ?? summary.discovered ?? summary.enriched ?? 0;
   // AI scoring runs once per candidate that reached matching (pool runs only, and only when a key is set).
   const scored = summary.aiUsed ? (summary.enriched ?? 0) : 0;
 

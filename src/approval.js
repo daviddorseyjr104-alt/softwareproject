@@ -6,7 +6,7 @@
 // auto-send pipelines; this one never sends without an explicit commit.
 import { getSettings } from './settings.js';
 import { loadPool, loadCompanyTiers } from './pool.js';
-import { matchCandidates, groupByCompany } from './matcher.js';
+import { matchCandidates, groupByCompany, preRank } from './matcher.js';
 import { defaultProviders } from './pipeline.js';
 import { dedupeByEmail } from './pipeline.js';
 import { isSuppressed } from './suppression.js';
@@ -32,13 +32,13 @@ export async function previewPool(log, providers = defaultProviders) {
   const { roles } = loadPool();
   const { map: tierMap } = loadCompanyTiers();
 
-  const summary = { kind: 'pool', status: 'preview', discovered: 0, enriched: 0, matched: 0, aiUsed: false, groups: [] };
+  const summary = { kind: 'pool', status: 'preview', discovered: 0, prescreened: 0, enrichAttempts: 0, enriched: 0, matched: 0, aiUsed: false, groups: [] };
 
-  // discover (dedupe by LinkedIn) → enrich (keep emails) → score/match
+  // [1] Discover a WIDE net (cheap) and dedupe by LinkedIn.
   const byLinkedin = new Map();
   for (const role of roles) {
     const found = await p.discoverCandidates(
-      { titles: role.searchTitles, location: role.location, limit: config.apollo.maxCandidates },
+      { titles: role.searchTitles, location: role.location, limit: config.apollo.discoverLimit },
       log,
     );
     for (const c of found) {
@@ -50,7 +50,14 @@ export async function previewPool(log, providers = defaultProviders) {
   summary.discovered = discovered.length;
   if (!discovered.length) { summary.status = 'no_candidates'; return finishPreview(summary); }
 
-  const enriched = (await p.enrichCandidates(discovered, log)).filter((c) => c.email);
+  // [2] Deterministically pre-rank the whole pool (free) and keep only the top finalists —
+  //     so we spend SalesQL credits on the best candidates, not on everyone Apollo returned.
+  const finalists = preRank(discovered, roles, tierMap).slice(0, config.apollo.maxCandidates).map((x) => x.candidate);
+  summary.prescreened = finalists.length;
+  summary.enrichAttempts = finalists.length;
+
+  // [3] Enrich ONLY the finalists.
+  const enriched = (await p.enrichCandidates(finalists, log)).filter((c) => c.email);
   summary.enriched = enriched.length;
   if (!enriched.length) { summary.status = 'no_emails'; return finishPreview(summary); }
 
