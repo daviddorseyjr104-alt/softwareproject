@@ -27,23 +27,22 @@ function loginHtml(error = '') {
 <title>Candidate Finder — Admin login</title>
 <style>
 *{box-sizing:border-box}
-body{font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,system-ui,sans-serif;color:#e8eef8;margin:0;min-height:100vh;
-  display:flex;align-items:center;justify-content:center;padding:1.5rem;-webkit-font-smoothing:antialiased;
-  background:radial-gradient(1000px 500px at 20% -10%,rgba(99,102,241,.16),transparent 60%),radial-gradient(900px 450px at 100% 0%,rgba(139,92,246,.12),transparent 55%),#0a0e1a}
-.card{background:linear-gradient(180deg,rgba(255,255,255,.02),transparent),#141d33;border:1px solid rgba(148,163,184,.14);
-  padding:2rem 1.9rem;border-radius:18px;width:100%;max-width:360px;box-shadow:0 24px 60px -20px rgba(0,0,0,.7)}
+body{font:14.5px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,system-ui,sans-serif;color:#0f172a;margin:0;min-height:100vh;
+  display:flex;align-items:center;justify-content:center;padding:1.5rem;-webkit-font-smoothing:antialiased;background:#f5f6f8}
+.card{background:#fff;border:1px solid #ebedf1;padding:2rem 1.9rem;border-radius:14px;width:100%;max-width:360px;
+  box-shadow:0 1px 2px rgba(16,24,40,.05),0 8px 30px -12px rgba(16,24,40,.15)}
 .head{display:flex;align-items:center;gap:.7rem;margin-bottom:1.4rem}
-.mark{width:38px;height:38px;border-radius:11px;flex:none;display:grid;place-items:center;font-size:1.15rem;
-  background:linear-gradient(135deg,#6366f1,#8b5cf6);box-shadow:0 8px 20px -6px rgba(99,102,241,.7)}
+.mark{width:38px;height:38px;border-radius:10px;flex:none;display:grid;place-items:center;font-size:1.15rem;
+  background:#2563eb;color:#fff;box-shadow:0 4px 12px -4px rgba(37,99,235,.55)}
 h1{font-size:1.05rem;margin:0;font-weight:650;letter-spacing:-.01em}
-.sub{font-size:.75rem;color:#5b6880;margin-top:1px}
-label{display:block;font-size:.78rem;color:#8a97ad;margin:0 0 .4rem;font-weight:500}
-input{width:100%;padding:.65rem .75rem;border-radius:10px;border:1px solid rgba(148,163,184,.24);background:#0d1424;color:#e8eef8;font:inherit;transition:border-color .15s,box-shadow .15s}
-input:focus{outline:none;border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.22)}
-button{width:100%;margin-top:1.1rem;padding:.7rem;border:0;border-radius:10px;color:#fff;font:inherit;font-weight:600;cursor:pointer;
-  background:linear-gradient(135deg,#6366f1,#8b5cf6);box-shadow:0 10px 24px -10px rgba(99,102,241,.9);transition:filter .15s,transform .12s}
-button:hover{filter:brightness(1.07);transform:translateY(-1px)}
-.err{color:#f87171;font-size:.85rem;margin-bottom:.9rem;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.28);padding:.55rem .7rem;border-radius:9px}
+.sub{font-size:.75rem;color:#94a3b8;margin-top:1px}
+label{display:block;font-size:.78rem;color:#64748b;margin:0 0 .4rem;font-weight:500}
+input{width:100%;padding:.62rem .75rem;border-radius:9px;border:1px solid #dde0e6;background:#fff;color:#0f172a;font:inherit;transition:border-color .15s,box-shadow .15s}
+input:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+button{width:100%;margin-top:1.1rem;padding:.68rem;border:0;border-radius:9px;color:#fff;font:inherit;font-weight:600;cursor:pointer;
+  background:#2563eb;transition:background .13s}
+button:hover{background:#1d4ed8}
+.err{color:#b91c1c;font-size:.85rem;margin-bottom:.9rem;background:rgba(220,38,38,.07);border:1px solid rgba(220,38,38,.22);padding:.55rem .7rem;border-radius:8px}
 </style></head>
 <body><form class="card" method="POST" action="/admin/login">
 <div class="head"><div class="mark">🎯</div><div><h1>Candidate Finder</h1><div class="sub">Admin sign in</div></div></div>
@@ -304,21 +303,30 @@ app.get('/admin/api/funnel', (_req, res) => {
   res.json(agg);
 });
 
-// Readiness snapshot for the status panel.
+// Readiness snapshot for the status panel + onboarding checklist.
 app.get('/admin/api/status', (_req, res) => {
   const keys = getMaskedSettings().keys;
   let pool = { ok: false, detail: '' };
+  let poolExample = false;
   try {
-    const { companies, roles } = loadPool();
+    const { companies, roles, usingExample } = loadPool();
     pool = { ok: true, detail: `${companies.length} companies, ${roles.length} roles` };
+    poolExample = usingExample;
   } catch (err) {
     pool = { ok: false, detail: err.message };
   }
+  // What's actually needed to DO things: preview needs discovery+enrichment; sending needs Instantly.
+  const canPreview = DEMO || (keys.apollo.set && keys.salesql.set);
+  const canSend = DEMO || keys.instantly.set;
   res.json({
     keys,
     pool,
+    poolExample,
     dryRun: getSettings().dryRun,
     demo: DEMO,
+    canPreview,
+    canSend,
+    ready: canPreview && pool.ok,
     webhookSecretSet: Boolean(bootConfig.webhookSecret),
     adminProtected: !adminOpen(),
   });
