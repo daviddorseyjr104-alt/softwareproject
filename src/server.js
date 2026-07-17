@@ -129,7 +129,7 @@ app.use((_req, res, next) => {
  * state that matters (jobs, settings) in memory already, so a shared store would be the only
  * distributed thing here.
  */
-function rateLimiter({ windowMs, max }) {
+function rateLimiter({ windowMs, max, onLimited }) {
   const hits = new Map(); // ip -> { count, resetAt }
   // Sweep expired buckets so a botnet cycling IPs can't grow this map without bound.
   setInterval(() => {
@@ -148,6 +148,10 @@ function rateLimiter({ windowMs, max }) {
     if (++bucket.count > max) {
       const retryAfter = Math.ceil((bucket.resetAt - now) / 1000);
       res.setHeader('Retry-After', String(retryAfter));
+      // A browser posting a form deserves a page, not a JSON blob it can't read. Without this,
+      // a locked-out operator sees {"error":"too_many_requests"} on a blank screen and has no
+      // idea it's temporary, how long it lasts, or that their password wasn't the problem.
+      if (onLimited) return onLimited(req, res, retryAfter);
       return res.status(429).json({ error: 'too_many_requests', retryAfter });
     }
     next();
@@ -162,7 +166,17 @@ function rateLimiter({ windowMs, max }) {
 // ADMIN_PASSWORD is human-chosen and guards the API keys, live sending, and every candidate's
 // personal email. Without a limit, a wordlist runs unattended at thousands of guesses/sec and the
 // 302-vs-401 response is a perfect oracle — the constant-time compare is moot without this.
-const loginLimiter = rateLimiter({ windowMs: 15 * 60 * 1000, max: 10 });
+const loginLimiter = rateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  onLimited: (_req, res, retryAfter) => {
+    const mins = Math.max(1, Math.ceil(retryAfter / 60));
+    res.status(429).type('html').send(loginHtml(
+      `Too many sign-in attempts. Try again in ${mins} minute${mins === 1 ? '' : 's'}. `
+      + 'If you have lost the password, reset ADMIN_PASSWORD in your host\'s environment settings.',
+    ));
+  },
+});
 // Discovery/enrichment spends real money per call, so the trigger routes get a ceiling too.
 const runLimiter = rateLimiter({ windowMs: 60 * 1000, max: 20 });
 
@@ -556,6 +570,23 @@ const server = app.listen(bootConfig.port, () => {
   logger.info('candidate-finder server listening', {
     port: bootConfig.port, demo: DEMO, env: bootConfig.nodeEnv, dryRun: getSettings().dryRun,
   });
+  // Log the SHAPE of the admin password — never the value. When "wrong password" is the only
+  // signal, the operator has no way to tell a typo from an env var that isn't what they think
+  // it is (a stale value, a trailing newline from a paste, a dashboard edit they forgot). The
+  // length and a fingerprint are enough to compare against what they're typing, and neither
+  // meaningfully helps an attacker who already has to get past the login rate limit.
+  if (bootConfig.adminPassword) {
+    logger.info('admin auth configured', {
+      passwordLength: bootConfig.adminPassword.length,
+      // Truncated HMAC, keyed to this host's SECRET_KEY — comparable, not reversible.
+      fingerprint: crypto.createHmac('sha256', bootConfig.secretKey || 'x')
+        .update(bootConfig.adminPassword).digest('hex').slice(0, 8),
+      hasSurroundingWhitespace: bootConfig.adminPassword !== bootConfig.adminPassword.trim(),
+    });
+  } else {
+    logger.warn('ADMIN_PASSWORD is not set — the admin console is UNPROTECTED');
+  }
+
   if (DEMO) {
     logger.warn('DEMO MODE — using fake providers; no real API calls or emails');
   } else {
