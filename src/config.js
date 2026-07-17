@@ -68,11 +68,18 @@ export function bootSafety() {
 
   // A weak ADMIN_PASSWORD is the whole security boundary: it guards the API keys, the send
   // button, and every candidate's personal email. Brute force is online and unattended, so
-  // length is the only defence that scales.
+  // length is the only defence that scales — and POST /admin/login is rate limited to make a
+  // short password expensive to guess rather than free.
+  //
+  // This WARNS. It must never be fatal: password length is a pre-existing condition on any
+  // already-running deployment, and refusing to boot over it turns a routine upgrade into an
+  // outage — taking the service down to protest a risk it was already carrying, and taking the
+  // admin UI (the place you'd fix it) down with it. Loud beats dead.
   if (bootConfig.adminPassword && bootConfig.adminPassword.length < 12) {
-    const msg = 'ADMIN_PASSWORD is shorter than 12 characters — it guards the API keys and live sending.';
-    if (bootConfig.isProduction) fatal.push(msg);
-    else warnings.push(msg);
+    warnings.push(
+      `ADMIN_PASSWORD is only ${bootConfig.adminPassword.length} characters — it guards your API keys, `
+      + 'live sending, and every candidate\'s personal email. Use 16+ random characters.',
+    );
   }
 
   // SECRET_KEY is stretched with scrypt, but a short passphrase still falls to an offline
