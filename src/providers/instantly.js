@@ -29,10 +29,14 @@ function assertConfigured() {
  * If INSTANTLY_TEMPLATE_CAMPAIGN_ID is set, we copy its email sequence into the new campaign
  * so your drafted copy/follow-ups auto-apply (blueprint Step 4).
  */
-export async function createCampaign(companyName, log) {
+export async function createCampaign(companyName, log, roleTitle = '') {
   assertConfigured();
   const config = getSettings();
-  const name = `${companyName} – Candidate Outreach`;
+  // Include the role: a company hiring for two roles gets two campaigns, and identical names
+  // would make them indistinguishable in the Instantly dashboard.
+  const name = roleTitle
+    ? `${companyName} – ${roleTitle} – Candidate Outreach`
+    : `${companyName} – Candidate Outreach`;
 
   const body = {
     name,
@@ -55,10 +59,15 @@ export async function createCampaign(companyName, log) {
     if (sequences) body.sequences = sequences;
   }
 
+  // Do NOT retry campaign creation. It is not idempotent and Instantly exposes no idempotency
+  // key: a timeout or 5xx AFTER Instantly committed the campaign would create a duplicate on
+  // retry, and the operator would find two identical campaigns with the leads split across them.
+  // addLeads is safe to retry (it passes skip_if_in_workspace); this is not.
   const data = await request(`${BASE}/campaigns`, {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify(body),
+    retries: 0,
     log,
   });
 
@@ -111,15 +120,19 @@ export async function addLeads(campaignId, candidates, form, log) {
       // Deduplicate defensively across the workspace/campaign.
       skip_if_in_workspace: true,
       skip_if_in_campaign: true,
+      // Two title variables, and they are NOT interchangeable:
+      //   {{jobTitle}}     — the candidate's CURRENT job ("I saw you're a Senior Backend Engineer")
+      //   {{rolePosition}} — the job being pitched      ("we're hiring a Staff Engineer")
+      // Every send path must agree on this; see the note in poolPipeline.toLead.
       custom_variables: {
         firstName: c.firstName || '',
         lastName: c.lastName || '',
-        company: c.company || '',
-        jobTitle: c.title || '',
+        company: c.company || '', // their current employer
+        jobTitle: c.title || '', // their current title
         linkedinUrl: c.linkedinUrl || '',
         // Context from the hiring company's form, useful in copy.
         hiringCompany: form.companyName || '',
-        rolePosition: form.jobPosition || '',
+        rolePosition: form.jobPosition || '', // the role being offered
         roleSalary: form.jobSalary || '',
       },
     };

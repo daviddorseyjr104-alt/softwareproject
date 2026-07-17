@@ -3,12 +3,15 @@ node_modules
 .env.local
 *.log
 logs
-data/settings.json
-data/jobs.json
-data/companies.json
-data/company-tiers.json
 .git
 test
 docs
 scripts/demo.js
 .DS_Store
+
+# Runtime state is PII (contacted emails, do-not-contact list, candidate jobs) and secrets
+# (encrypted API keys). Deny the whole directory and re-admit only the committed samples —
+# an allowlist here drifts the moment a new state file is added, and the failure mode is
+# baking real personal emails into a pushed image layer forever.
+data/*
+!data/*.example.json

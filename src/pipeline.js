@@ -8,7 +8,8 @@ import { discoverCandidates } from './providers/apollo.js';
 import { enrichCandidates } from './providers/salesql.js';
 import { createCampaign, addLeads, activateCampaign } from './providers/instantly.js';
 import { enrichGithub } from './providers/github.js';
-import { isSuppressed } from './suppression.js';
+import { screenForSend } from './sendGate.js';
+import { recordContacts } from './contacts.js';
 
 export const defaultProviders = {
   discoverCandidates,
@@ -61,11 +62,12 @@ export async function runPipeline(form, log, providers = defaultProviders) {
     return summary;
   }
 
-  // [2] Enrichment (personal emails). Drop dupes AND anyone on the do-not-contact list —
-  // suppression must apply to the automated webhook path, not just the admin approval flow.
+  // [2] Enrichment (personal emails). Drop dupes, then run the shared send gate — suppression
+  // and the dedupe window apply to the automated webhook path, not just the admin approval flow.
   const enriched = await p.enrichCandidates(discovered, log);
-  const deduped = dedupeByEmail(enriched).filter((c) => !isSuppressed(c.email));
+  const { sendable: deduped, skipped } = screenForSend(dedupeByEmail(enriched), { log });
   summary.enriched = deduped.length;
+  summary.skipped = skipped;
 
   // Per blueprint: if no qualified candidates with email, finish WITHOUT creating a campaign.
   if (deduped.length === 0) {
@@ -94,6 +96,11 @@ export async function runPipeline(form, log, providers = defaultProviders) {
   summary.leadsAdded = added;
 
   summary.activated = await p.activateCampaign(campaign.id, log);
+  // Record the send: the audit trail must cover every path that emails someone, and the
+  // dedupe window can only protect people whose prior contact was actually written down.
+  recordContacts(deduped.map((c) => ({
+    email: c.email, company: form.companyName, role: form.jobPosition || '', campaignId: campaign.id,
+  })));
   summary.durationMs = Date.now() - startedAt;
   log.info('pipeline finished', summary);
   return summary;

@@ -12,7 +12,11 @@
     color-scheme: light;
     --bg: #f6f7fb; --surface: #ffffff; --surface-2: #f6f7f9; --card: #ffffff;
     --line: #edeef2; --line-strong: #e0e2e9;
-    --text: #0b1020; --muted: #5c6474; --faint: #98a0b0;
+    /* --faint was #98a0b0 — 2.6:1 on white, below the 4.5:1 AA minimum. It styles every metric
+       tile LABEL, every candidate's EMAIL, hints, table headers, and the struck-through
+       missing-skill chips: the numbers were legible but not what they measured. #6b7280 is
+       4.8:1 and keeps the same visual hierarchy. */
+    --text: #0b1020; --muted: #5c6474; --faint: #6b7280;
     --brand: #2563eb; --brand-2: #4f46e5; --brand-strong: #1d4ed8; --brand-weak: rgba(37,99,235,.08);
     --grad: linear-gradient(135deg, #4f46e5, #2563eb);
     --ok: #16a34a; --bad: #e11d48; --warn: #d97706;
@@ -71,7 +75,35 @@
   label { display: block; font-size: .78rem; color: var(--muted); margin: .8rem 0 .32rem; font-weight: 550; }
   input, textarea, select { width: 100%; padding: .58rem .72rem; border-radius: 9px; border: 1px solid var(--line-strong); background: #fff; color: var(--text); font: inherit; font-size: .9rem; transition: border-color .15s, box-shadow .15s; }
   input::placeholder { color: var(--faint); }
-  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-weak); }
+  /* --brand-weak is 8% opacity: removing the UA outline and "replacing" it with that ring left
+     keyboard focus essentially invisible across every field, including the API-key inputs.
+     A visible ring at 35% + a real outline for anything focused by keyboard. */
+  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px rgba(37,99,235,.35); }
+  :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 6px; }
+
+  .skip { position: absolute; left: -9999px; top: .5rem; z-index: 100; background: var(--brand); color: #fff;
+    padding: .55rem .9rem; border-radius: 8px; font-weight: 600; text-decoration: none; }
+  .skip:focus { left: .5rem; }
+  .brandname { font-size: 1.02rem; font-weight: 680; letter-spacing: -.02em; color: var(--text); }
+
+  /* Persistent error surface — errors must not live in a 2.4s toast. */
+  #error-bar { margin-bottom: .9rem; }
+  .banner.errb { background: rgba(225,29,72,.06); border: 1px solid rgba(225,29,72,.25); color: #9f1239; position: relative; }
+  .banner.errb code { display: block; margin-top: .4rem; font-size: .76rem; color: var(--muted); word-break: break-all; white-space: pre-wrap; }
+  .banner.errb details { margin-top: .35rem; }
+  .banner.errb summary { cursor: pointer; font-size: .78rem; color: var(--muted); }
+  .banner-help { margin-top: .5rem; font-size: .84rem; font-weight: 400; line-height: 1.55; }
+  .err-x { position: absolute; top: .45rem; right: .5rem; background: none; border: 0; cursor: pointer; color: var(--muted); font-size: .9rem; width: auto; padding: .2rem .35rem; }
+
+  /* Inline text button used by empty-state help and the approve bar. */
+  .linkbtn { background: none; border: 0; color: var(--brand); font: inherit; font-size: .82rem; font-weight: 600;
+    cursor: pointer; padding: .15rem .3rem; width: auto; text-decoration: underline; text-underline-offset: 2px; }
+  .linkbtn:hover { color: var(--brand-strong); }
+
+  /* The candidate row is a real <button> now, so it must not look like one. */
+  .cand-open { display: flex; align-items: center; gap: .7rem; flex: 1; min-width: 0; background: none; border: 0;
+    font: inherit; color: inherit; text-align: left; cursor: pointer; padding: 0; width: auto; }
+  .cand-open:hover .nm { color: var(--brand); }
   textarea { min-height: 220px; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px; line-height: 1.5; white-space: pre; resize: vertical; }
   select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%235c6474' d='M6 8L2 4h8z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right .7rem center; padding-right: 1.9rem; }
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
@@ -233,6 +265,7 @@
 </defs></svg>
 
 <div class="app">
+<a class="skip" href="#main">Skip to main content</a>
 <aside class="sidebar">
   <div class="brand">
     <svg class="logo" viewBox="0 0 34 34" aria-hidden="true">
@@ -242,23 +275,29 @@
       <line x1="19.4" y1="19.4" x2="24" y2="24" stroke="#fff" stroke-width="2.1" stroke-linecap="round"/>
       <path d="M22 8l.85 2.05L25 10.9l-2.15.85L22 14l-.85-2.25L19 10.9l2.15-.85z" fill="#fff"/>
     </svg>
-    <div><h1>Candidate Finder</h1><div class="sub">Talent matching</div></div>
+    <div><div class="brandname">Candidate Finder</div><div class="sub">Talent matching</div></div>
   </div>
   <div class="navlabel">Workspace</div>
-  <nav class="tabs" id="tabs">
-    <button data-tab="dashboard" class="active"><svg class="ic"><use href="#i-grid"/></svg> Dashboard</button>
-    <button data-tab="keys"><svg class="ic"><use href="#i-key"/></svg> API keys</button>
-    <button data-tab="scoring"><svg class="ic"><use href="#i-sliders"/></svg> Scoring</button>
-    <button data-tab="companies"><svg class="ic"><use href="#i-building"/></svg> Companies</button>
-    <button data-tab="safety"><svg class="ic"><use href="#i-shield"/></svg> Safety</button>
-    <button data-tab="runs"><svg class="ic"><use href="#i-inbox"/></svg> Runs</button>
+  <!-- role=tablist + aria-selected: these were six unrelated buttons to a screen reader, with
+       "which one am I on?" conveyed purely by background colour (also an SC 1.4.1 failure). -->
+  <nav class="tabs" id="tabs" role="tablist" aria-label="Workspace sections">
+    <button role="tab" data-tab="dashboard" class="active" aria-selected="true" aria-controls="panel-dashboard"><svg class="ic" aria-hidden="true"><use href="#i-grid"/></svg> Dashboard</button>
+    <button role="tab" data-tab="keys" aria-selected="false" aria-controls="panel-keys"><svg class="ic" aria-hidden="true"><use href="#i-key"/></svg> API keys</button>
+    <button role="tab" data-tab="scoring" aria-selected="false" aria-controls="panel-scoring"><svg class="ic" aria-hidden="true"><use href="#i-sliders"/></svg> Scoring</button>
+    <button role="tab" data-tab="companies" aria-selected="false" aria-controls="panel-companies"><svg class="ic" aria-hidden="true"><use href="#i-building"/></svg> Companies</button>
+    <button role="tab" data-tab="safety" aria-selected="false" aria-controls="panel-safety"><svg class="ic" aria-hidden="true"><use href="#i-shield"/></svg> Safety</button>
+    <button role="tab" data-tab="runs" aria-selected="false" aria-controls="panel-runs"><svg class="ic" aria-hidden="true"><use href="#i-inbox"/></svg> Runs</button>
   </nav>
   <form class="logout" method="POST" action="/admin/logout"><button class="secondary" type="submit">Log out</button></form>
 </aside>
-<main>
+<main id="main" tabindex="-1">
+  <!-- Persistent error surface. Errors used to appear only in a toast that self-destructed in
+       2.4s, was announced to no screen reader, and could not be recalled — including commit
+       failures, the one moment where money and reputation are on the line. -->
+  <div id="error-bar" hidden></div>
 
   <!-- DASHBOARD -->
-  <section class="panel active" id="panel-dashboard">
+  <section class="panel active" id="panel-dashboard" role="tabpanel" tabindex="0" aria-label="Dashboard">
     <h1 class="page-title">Dashboard</h1>
     <p class="page-sub">Find, review, and launch outreach to the best candidates.</p>
     <div class="card setup" id="setup-card" style="display:none">
@@ -276,18 +315,18 @@
       <div class="card-head"><div class="ico"><svg class="ic"><use href="#i-search"/></svg></div><h2>Find candidates</h2></div>
       <p class="card-desc">Runs a <b>preview</b> — it discovers &amp; scores candidates but sends nothing. You review, approve, then launch.</p>
       <div class="row">
-        <div><label>Hiring company</label><input id="s-company" placeholder="Acme Builders" value="Acme Builders"></div>
-        <div><label>Role / position</label><input id="s-role" placeholder="Senior Backend Engineer" value="Senior Backend Engineer"></div>
+        <div><label for="s-company">Hiring company</label><input id="s-company" placeholder="Acme Builders" value="Acme Builders"></div>
+        <div><label for="s-role">Role / position</label><input id="s-role" placeholder="Senior Backend Engineer" value="Senior Backend Engineer"></div>
       </div>
       <div class="row3">
-        <div><label>City</label><input id="s-city" placeholder="Denver" value="Denver"></div>
-        <div><label>State</label><input id="s-state" placeholder="Colorado" value="Colorado"></div>
-        <div><label>Also looking for (comma-sep)</label><input id="s-extra" placeholder="Backend Engineer, Staff Engineer"></div>
+        <div><label for="s-city">City</label><input id="s-city" placeholder="Denver" value="Denver"></div>
+        <div><label for="s-state">State</label><input id="s-state" placeholder="Colorado" value="Colorado"></div>
+        <div><label for="s-extra">Also looking for (comma-sep)</label><input id="s-extra" placeholder="Backend Engineer, Staff Engineer"></div>
       </div>
       <div class="actions">
         <button class="big cta" id="btn-search" onclick="runSearch()">Preview candidates</button>
         <button class="secondary big" id="btn-pool" onclick="runPool()">Match whole pool</button>
-        <span id="run-msg" class="status muted"></span>
+        <span id="run-msg" class="status muted" role="status" aria-live="polite"></span>
       </div>
     </div>
 
@@ -308,12 +347,13 @@
       <div class="card-head"><div class="ico"><svg class="ic"><use href="#i-link"/></svg></div><h2>Form webhook</h2></div>
       <p class="card-desc">Point your GoHighLevel / Flowsa form here to trigger searches automatically.</p>
       <div class="hookbox"><code id="webhook-url">…</code><button class="secondary copybtn" onclick="copyWebhook()">Copy</button></div>
-      <p class="hint">Add your <code class="inline">WEBHOOK_SECRET</code> as the <code class="inline">?secret=</code> value or an <code class="inline">x-webhook-secret</code> header.</p>
+      <p class="hint">Send your <code class="inline">WEBHOOK_SECRET</code> as an <code class="inline">x-webhook-secret</code> <strong>header</strong>. Both GoHighLevel and Flowsa support custom webhook headers.<br>
+        A <code class="inline">?secret=</code> query value is <strong>not</strong> accepted: URLs leak into access logs, proxy logs, browser history, and the <code class="inline">Referer</code> header.</p>
     </div>
   </section>
 
   <!-- KEYS -->
-  <section class="panel" id="panel-keys">
+  <section class="panelNone" id="panel-keys" role="tabpanel" tabindex="0" aria-label="Keys">
     <h1 class="page-title">API keys</h1>
     <p class="page-sub">Connect the services that power discovery, enrichment, and outreach.</p>
     <div class="card">
@@ -325,69 +365,69 @@
   </section>
 
   <!-- SCORING -->
-  <section class="panel" id="panel-scoring">
+  <section class="panelNone" id="panel-scoring" role="tabpanel" tabindex="0" aria-label="Scoring">
     <h1 class="page-title">Scoring &amp; behaviour</h1>
     <p class="page-sub">Tune how candidates are found, ranked, and sent.</p>
     <div class="card">
       <div class="card-head"><div class="ico"><svg class="ic"><use href="#i-sliders"/></svg></div><h2>Discovery, scoring &amp; sending</h2></div>
       <div class="row3">
-        <div><label>Discover per role (wide net)</label><input id="discoverLimit" type="number"></div>
-        <div><label>Enrich top N (finalists — paid)</label><input id="maxCandidates" type="number"></div>
-        <div><label>Score threshold (0–100)</label><input id="scoreThreshold" type="number"></div>
+        <div><label for="discoverLimit">Discover per role (wide net)</label><input id="discoverLimit" type="number"></div>
+        <div><label for="maxCandidates">Enrich top N (finalists — paid)</label><input id="maxCandidates" type="number"></div>
+        <div><label for="scoreThreshold">Score threshold (0–100)</label><input id="scoreThreshold" type="number"></div>
       </div>
       <div class="row3">
-        <div><label>AI effort</label><select id="aiEffort"><option>low</option><option>medium</option><option>high</option><option>xhigh</option><option>max</option></select></div>
-        <div><label>Auto-source every N hours (0 = off)</label><input id="scheduleHours" type="number"></div>
-        <div><label>Re-contact guard (days; 0 = off)</label><input id="dedupeWindowDays" type="number"></div>
+        <div><label for="aiEffort">AI effort</label><select id="aiEffort"><option>low</option><option>medium</option><option>high</option><option>xhigh</option><option>max</option></select></div>
+        <div><label for="scheduleHours">Auto-source every N hours (0 = off)</label><input id="scheduleHours" type="number"></div>
+        <div><label for="dedupeWindowDays">Re-contact guard (days; 0 = off)</label><input id="dedupeWindowDays" type="number"></div>
       </div>
       <div class="row">
-        <div><label>GitHub deep-profile enrichment</label><select id="enrichGithub"><option value="true">on — read real repos/languages/stars</option><option value="false">off</option></select></div>
+        <div><label for="enrichGithub">GitHub deep-profile enrichment</label><select id="enrichGithub"><option value="true">on — read real repos/languages/stars</option><option value="false">off</option></select></div>
       </div>
       <div class="row4">
-        <div><label>Weight: AI</label><input id="weightAi" type="number" step="0.05"></div>
-        <div><label>Weight: skills</label><input id="weightSkills" type="number" step="0.05"></div>
-        <div><label>Weight: seniority</label><input id="weightSeniority" type="number" step="0.05"></div>
-        <div><label>Weight: pedigree</label><input id="weightPedigree" type="number" step="0.05"></div>
+        <div><label for="weightAi">Weight: AI</label><input id="weightAi" type="number" step="0.05"></div>
+        <div><label for="weightSkills">Weight: skills</label><input id="weightSkills" type="number" step="0.05"></div>
+        <div><label for="weightSeniority">Weight: seniority</label><input id="weightSeniority" type="number" step="0.05"></div>
+        <div><label for="weightPedigree">Weight: pedigree</label><input id="weightPedigree" type="number" step="0.05"></div>
       </div>
       <div class="row3">
-        <div><label>Instantly timezone</label><input id="instantlyTimezone"></div>
-        <div><label>Send from</label><input id="instantlySendingFrom" placeholder="09:00"></div>
-        <div><label>Send to</label><input id="instantlySendingTo" placeholder="17:00"></div>
+        <div><label for="instantlyTimezone">Instantly timezone</label><input id="instantlyTimezone"></div>
+        <div><label for="instantlySendingFrom">Send from</label><input id="instantlySendingFrom" placeholder="09:00"></div>
+        <div><label for="instantlySendingTo">Send to</label><input id="instantlySendingTo" placeholder="17:00"></div>
       </div>
       <div class="row">
-        <div><label>Instantly template campaign id (optional)</label><input id="instantlyTemplateCampaignId"></div>
-        <div><label>Test company names (comma-sep — force dry-run)</label><input id="testCompanyNames"></div>
+        <div><label for="instantlyTemplateCampaignId">Instantly template campaign id (optional)</label><input id="instantlyTemplateCampaignId"></div>
+        <div><label for="testCompanyNames">Test company names (comma-sep — force dry-run)</label><input id="testCompanyNames"></div>
       </div>
       <div class="row3">
-        <div><label>Personal emails only</label><select id="personalOnly"><option value="true">true</option><option value="false">false</option></select></div>
-        <div><label>Dry run (create nothing in Instantly)</label><select id="dryRun"><option value="true">true</option><option value="false">false</option></select></div>
-        <div><label>Apollo seniorities (comma-sep)</label><input id="seniorities"></div>
+        <div><label for="personalOnly">Personal emails only</label><select id="personalOnly"><option value="true">true</option><option value="false">false</option></select></div>
+        <div><label for="dryRun">Dry run (create nothing in Instantly)</label><select id="dryRun"><option value="true">true</option><option value="false">false</option></select></div>
+        <div><label for="seniorities">Apollo seniorities (comma-sep)</label><input id="seniorities"></div>
       </div>
       <div class="actions"><button onclick="saveSettings()">Save settings</button><span id="settings-msg" class="status muted"></span></div>
     </div>
   </section>
 
   <!-- COMPANIES -->
-  <section class="panel" id="panel-companies">
+  <section class="panelNone" id="panel-companies" role="tabpanel" tabindex="0" aria-label="Companies">
     <h1 class="page-title">Companies &amp; roles</h1>
     <p class="page-sub">Your hiring pool — the companies and open roles we match candidates to.</p>
     <div class="card">
       <div class="card-head"><div class="ico"><svg class="ic"><use href="#i-building"/></svg></div><h2>Hiring pool</h2></div>
       <p class="card-desc">Edit the JSON, then Save — it is validated before it is stored.</p>
-      <label>companies.json</label><textarea id="companies"></textarea>
-      <label>company-tiers.json (employer pedigree)</label><textarea id="tiers"></textarea>
+      <label for="companies">companies.json</label><textarea id="companies"></textarea>
+      <label for="tiers">company-tiers.json (employer pedigree)</label><textarea id="tiers"></textarea>
       <div class="actions"><button onclick="savePool()">Save pool</button><span id="pool-msg" class="status muted"></span></div>
     </div>
   </section>
 
   <!-- SAFETY -->
-  <section class="panel" id="panel-safety">
+  <section class="panelNone" id="panel-safety" role="tabpanel" tabindex="0" aria-label="Safety">
     <h1 class="page-title">Safety</h1>
     <p class="page-sub">Guardrails that keep outreach clean and compliant.</p>
     <div class="card">
       <div class="card-head"><div class="ico"><svg class="ic"><use href="#i-shield"/></svg></div><h2>Do-not-contact list</h2><div class="spacer"></div><span id="contact-count" class="status muted"></span></div>
       <p class="card-desc">Anyone here is <b>never</b> emailed — even if approved. Add an email, or a whole domain (e.g. <code class="inline">competitor.com</code>).</p>
-      <div class="row"><div><label>Add email or domain</label><input id="supp-add" placeholder="person@example.com  or  example.com"></div>
+      <div class="row"><div><label for="supp-add">Add email or domain</label><input id="supp-add" placeholder="person@example.com  or  example.com"></div>
         <div style="display:flex;align-items:flex-end"><button onclick="addSupp()" style="width:100%">Add to list</button></div></div>
       <div id="supp-emails-wrap" style="margin-top:1rem"></div>
       <div id="supp-domains-wrap" style="margin-top:.6rem"></div>
@@ -400,7 +440,7 @@
   </section>
 
   <!-- RUNS -->
-  <section class="panel" id="panel-runs">
+  <section class="panelNone" id="panel-runs" role="tabpanel" tabindex="0" aria-label="Runs">
     <h1 class="page-title">Recent runs</h1>
     <p class="page-sub">Every preview and launch, with what it found and what it cost.</p>
     <div class="card">
@@ -412,26 +452,145 @@
 
 </main>
 </div>
-<div class="toast" id="toast"></div>
+<!-- role=status + aria-live: the toast was the app's ONLY feedback channel and was
+     silent to screen readers. -->
+<div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
 <script>
 const $ = (id) => document.getElementById(id);
 const KEY_SERVICES = [['apollo','Apollo'],['salesql','SalesQL'],['instantly','Instantly'],['anthropic','Anthropic (opt)'],['github','GitHub (opt)']];
-const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-async function api(path, opts) {
-  const res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...opts });
-  if (res.status === 401) { location.href = '/admin/login'; throw new Error('unauthorized'); }
-  return res.json();
+// Escapes ' and ` too, not just & < > ". The omission was exploitable: suppression chips
+// interpolated esc(v) into a SINGLE-quoted onclick string, so a do-not-contact entry containing
+// an apostrophe broke out of the string literal and ran as script for the next operator to open
+// the tab — persisted to disk, in an authenticated admin origin. It also meant a legitimate
+// address like o'brien@example.com could never be removed.
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"'`]/g, (c) =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'}[c]));
+/**
+ * Fetch wrapper that fails LOUDLY and in human language.
+ *
+ * The old version called res.json() unconditionally with no res.ok check, so a 502, a cold
+ * start, or any proxy HTML error page threw a raw "Unexpected token '<'" as an unhandled
+ * rejection — nothing rendered and nothing was said. Callers that didn't catch (most of them)
+ * left the console spinning forever with both buttons disabled.
+ */
+class ApiError extends Error {
+  constructor(message, { status, detail } = {}) {
+    super(message);
+    this.status = status;
+    this.detail = detail;
+  }
 }
+
+async function api(path, opts) {
+  let res;
+  try {
+    res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...opts });
+  } catch {
+    throw new ApiError("Can't reach the server — check your connection.", { status: 0 });
+  }
+  if (res.status === 401) { location.href = '/admin/login'; throw new ApiError('Session expired.', { status: 401 }); }
+
+  const text = await res.text().catch(() => '');
+  let body = null;
+  try { body = text ? JSON.parse(text) : null; } catch { /* not JSON — handled below */ }
+
+  if (!res.ok) {
+    throw new ApiError(humanHttpError(res.status, body), { status: res.status, detail: body?.error || text.slice(0, 300) });
+  }
+  if (body === null && text) throw new ApiError('The server returned an unexpected response.', { status: res.status, detail: text.slice(0, 300) });
+  return body ?? {};
+}
+
+/** Turn a status code into something a recruiter can act on. */
+function humanHttpError(status, body) {
+  const server = body?.error || body?.detail || '';
+  if (status === 429) return 'Too many attempts — wait a minute and try again.';
+  if (status === 503) return server ? `Server busy: ${server}` : 'The server is busy running other jobs — try again shortly.';
+  if (status === 409) return server || 'That action was already performed.';
+  if (status === 404) return server || 'Not found.';
+  if (status === 422) return server || 'Some fields need fixing.';
+  if (status >= 500) return 'The server hit an error — nothing was charged. Try again, or check the logs.';
+  return server || `Request failed (HTTP ${status}).`;
+}
+
+/**
+ * Map a provider failure to operator language. `job.error` is the raw err.message from Apollo /
+ * SalesQL / Instantly, so a stale key used to surface as "apollo request failed: 401
+ * Unauthorized" to someone who does not know what an HTTP status code is.
+ */
+function humanRunError(raw) {
+  const s = String(raw || '');
+  const provider = /apollo/i.test(s) ? 'Apollo' : /salesql/i.test(s) ? 'SalesQL'
+    : /instantly/i.test(s) ? 'Instantly' : /anthropic|claude/i.test(s) ? 'Anthropic'
+      : /github/i.test(s) ? 'GitHub' : null;
+  if (/401|403|unauthorized|forbidden|invalid.*key/i.test(s)) {
+    return { msg: `Your ${provider || 'API'} key was rejected.`, action: 'keys', actionLabel: 'Check API keys' };
+  }
+  if (/429|rate.?limit/i.test(s)) {
+    return { msg: `${provider || 'The provider'} rate-limited us and the retries ran out. Wait a few minutes and try again.` };
+  }
+  if (/timeout|ETIMEDOUT|ENOTFOUND|ECONNREFUSED|network/i.test(s)) {
+    return { msg: `Couldn't reach ${provider || 'the provider'} — nothing was charged. Try again shortly.` };
+  }
+  if (/not configured|is not set/i.test(s)) {
+    return { msg: `${provider || 'A provider'} isn't configured yet.`, action: 'keys', actionLabel: 'Add API keys' };
+  }
+  return { msg: `The run failed: ${s}` };
+}
+
 function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2400); }
+
+/**
+ * Persistent, dismissible error. Errors must NOT go to the toast: it vanishes in 2.4s, can't be
+ * recalled, and is announced to nobody — a poor fit for the moments where money and reputation
+ * are on the line.
+ */
+function showError(title, err) {
+  const detail = err instanceof ApiError && err.detail ? String(err.detail) : (err?.message || '');
+  const box = $('error-bar');
+  box.innerHTML = `<div class="banner errb" role="alert">
+    <strong>${esc(title)}</strong>${err?.message ? ' — ' + esc(err.message) : ''}
+    ${detail && detail !== err?.message ? `<details><summary>Technical details</summary><code>${esc(detail)}</code></details>` : ''}
+    <button type="button" class="err-x" aria-label="Dismiss error">✕</button>
+  </div>`;
+  box.hidden = false;
+  box.querySelector('.err-x').addEventListener('click', () => { box.hidden = true; box.innerHTML = ''; });
+  box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+function clearError() { const b = $('error-bar'); if (b) { b.hidden = true; b.innerHTML = ''; } }
 
 $('tabs').addEventListener('click', (e) => {
   const btn = e.target.closest('button[data-tab]'); if (!btn) return;
-  document.querySelectorAll('nav.tabs button').forEach((b) => b.classList.toggle('active', b === btn));
-  document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('active', p.id === 'panel-' + btn.dataset.tab));
-  if (btn.dataset.tab === 'runs') loadJobs();
-  if (btn.dataset.tab === 'safety') loadSafety();
+  selectTab(btn.dataset.tab);
 });
+
+// Arrow-key navigation, as a tablist is expected to have.
+$('tabs').addEventListener('keydown', (e) => {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+  const tabs = [...document.querySelectorAll('nav.tabs button[role=tab]')];
+  const i = tabs.indexOf(document.activeElement);
+  if (i < 0) return;
+  e.preventDefault();
+  const next = e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1
+    : e.key === 'ArrowLeft' ? (i - 1 + tabs.length) % tabs.length : (i + 1) % tabs.length;
+  tabs[next].focus();
+  selectTab(tabs[next].dataset.tab);
+});
+
+function selectTab(tab) {
+  document.querySelectorAll('nav.tabs button[role=tab]').forEach((b) => {
+    const on = b.dataset.tab === tab;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-selected', String(on)); // colour alone can't convey selection
+  });
+  document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('active', p.id === 'panel-' + tab));
+  // Reflect the tab in the URL so it can be bookmarked, linked, and — most importantly —
+  // survive the Back button, which used to exit the console entirely.
+  if (!location.hash.startsWith('#run=')) history.replaceState(null, '', '#' + tab);
+  if (tab === 'runs') loadJobs();
+  if (tab === 'safety') loadSafety();
+}
 
 function copyWebhook() {
   navigator.clipboard?.writeText($('webhook-url').textContent).then(() => toast('Webhook URL copied.'), () => toast('Copy failed.'));
@@ -446,10 +605,20 @@ async function runSearch() {
     companyCity: $('s-city').value.trim(), companyState: $('s-state').value.trim(), positionsIAmLookingFor: $('s-extra').value.trim() };
   if (!body.companyName || !body.jobPositionName) return toast('Enter a company and a role first.');
   if (!requireKeysForPreview()) return;
+  if (!await confirmSpend('Preview candidates')) return;
+  clearError();
   setRunning(true, 'Searching…');
-  const r = await api('/admin/api/run-search', { method: 'POST', body: JSON.stringify(body) });
-  if (!r.ok) { setRunning(false); return toast('Rejected: ' + (r.errors || []).join(' ')); }
-  trackRun(r.requestId, 'Searching for candidates…');
+  // try/finally: an uncaught throw here used to skip setRunning(false), leaving both buttons
+  // disabled and the spinner going forever with no message — the console was bricked until
+  // someone thought to hard-refresh.
+  try {
+    const r = await api('/admin/api/run-search', { method: 'POST', body: JSON.stringify(body) });
+    if (!r.ok) { setRunning(false); return showError('Search rejected', new Error((r.errors || []).join(' '))); }
+    trackRun(r.requestId, 'Searching for candidates…');
+  } catch (err) {
+    setRunning(false);
+    showError('Could not start the search', err);
+  }
 }
 function requireKeysForPreview() {
   if (st.canPreview) return true;
@@ -460,23 +629,130 @@ function requireKeysForPreview() {
 }
 async function runPool() {
   if (!requireKeysForPreview()) return;
+  if (!await confirmSpend('Match whole pool')) return;
+  clearError();
   setRunning(true, 'Matching pool…');
-  const r = await api('/admin/api/run-pool', { method: 'POST' });
-  if (!r.ok) { setRunning(false); return toast('Could not start pool run.'); }
-  trackRun(r.requestId, 'Scoring & matching your whole pool…');
+  try {
+    const r = await api('/admin/api/run-pool', { method: 'POST' });
+    if (!r.ok) { setRunning(false); return showError('Could not start the pool run', new Error(r.error || '')); }
+    trackRun(r.requestId, 'Scoring & matching your whole pool…');
+  } catch (err) {
+    setRunning(false);
+    showError('Could not start the pool run', err);
+  }
 }
+
+/**
+ * Show what a preview will COST before it runs.
+ *
+ * "Preview" only promises it sends nothing — it does not mean free. It hits Apollo, then pays
+ * SalesQL per lookup (charged hit or miss), then Claude per candidate. The cost tile only ever
+ * rendered inside renderApproval — i.e. after the credits were already spent. Every input is on
+ * screen, so there's no reason the operator learns the price after paying it.
+ */
+async function confirmSpend(action) {
+  const v = st?.values || {};
+  const est = estimatePreviewCost(v);
+  if (st?.demo || est.total < 0.5) return true; // trivial or fake spend — don't nag
+  return confirm(`${action} will spend about $${est.total.toFixed(2)} on API credits.\n\n` +
+    `• Apollo discovery: ~$${est.apollo.toFixed(2)}\n` +
+    `• SalesQL lookups (charged hit or miss): ~$${est.salesql.toFixed(2)}\n` +
+    (est.anthropic > 0 ? `• Claude scoring: ~$${est.anthropic.toFixed(2)}\n` : '') +
+    `\nNo emails are sent by a preview. Continue?`);
+}
+
+// Mirrors src/cost.js DEFAULT_PRICES. Kept client-side so the estimate can be shown BEFORE the
+// run — the server has no chance to report a cost for work it hasn't done yet.
+const PRICES = { apolloPerDiscovered: 0.01, salesqlPerLookup: 0.04, anthropicPerScore: 0.017 };
+function estimatePreviewCost(v) {
+  const discover = Number(v.discoverLimit) || 100;
+  const finalists = Number(v.maxCandidates) || 25;
+  const roles = Number(st?.poolRoles) || 1;
+  const apollo = discover * roles * PRICES.apolloPerDiscovered;
+  const salesql = finalists * PRICES.salesqlPerLookup;
+  const anthropic = st?.keys?.anthropic?.set ? finalists * PRICES.anthropicPerScore : 0;
+  return { apollo, salesql, anthropic, total: apollo + salesql + anthropic };
+}
+/**
+ * Poll a run to completion.
+ *
+ * Rewritten from a 1s setInterval that (a) fired regardless of whether the previous request had
+ * returned, stacking requests on a slow link, (b) swallowed every poll error silently, so a
+ * dropped connection looked identical to a healthy run, and (c) gave up after 180 tries with
+ * "Still running after 3 min" — for a multi-role pool run at discoverLimit 100 with a Claude
+ * call per candidate, three minutes is the EXPECTED case, not the timeout case. The job is
+ * durable server-side, so there is no reason to stop watching it.
+ */
 function trackRun(id, label) {
-  $('results').innerHTML = `<div class="empty"><span class="spinner"></span><div style="margin-top:.7rem">${esc(label)}</div></div>`;
-  clearInterval(polling); let tries = 0; const MAX = 180;
-  polling = setInterval(async () => {
-    let job; try { job = await api('/admin/api/jobs/' + id); } catch { return; }
-    if (job.status === 'processing') { if (++tries < MAX) return; clearInterval(polling); setRunning(false);
-      $('results').innerHTML = `<div class="banner warnb">⏱️ Still running after 3 min. Check the Runs tab later.</div>`; return; }
-    clearInterval(polling); setRunning(false);
-    if (job.status === 'failed') $('results').innerHTML = `<div class="banner warnb">⚠️ Run failed: ${esc(job.error || 'unknown')}</div>`;
-    else { renderApproval(job); loadHud(); }
+  $('results').innerHTML = `<div class="empty" role="status" aria-live="polite"><span class="spinner"></span><div style="margin-top:.7rem">${esc(label)}</div></div>`;
+  stopPolling();
+  currentPreview = id;
+  location.hash = 'run=' + id; // survive a refresh — see reattachFromHash()
+
+  const startedAt = Date.now();
+  let failures = 0;
+  let delay = 1000;
+
+  const tick = async () => {
+    let job;
+    try {
+      job = await api('/admin/api/jobs/' + id);
+      failures = 0;
+      delay = 1000;
+    } catch (err) {
+      // Surface the disconnect instead of pretending the run is fine, and back off rather
+      // than hammering a server that's already struggling.
+      if (++failures >= 3) {
+        setRunStatus(`⚠️ Lost connection to the server — retrying (${failures})…`);
+        delay = Math.min(delay * 2, 15000);
+      }
+      if (failures > 20) { stopPolling(); setRunning(false); showError('Stopped watching this run', err); return; }
+      polling = setTimeout(tick, delay);
+      return;
+    }
+
+    if (job.status === 'processing') {
+      const mins = Math.floor((Date.now() - startedAt) / 60000);
+      const secs = Math.floor(((Date.now() - startedAt) % 60000) / 1000);
+      setRunStatus(`${esc(label)} · ${mins}m ${String(secs).padStart(2, '0')}s elapsed`);
+      polling = setTimeout(tick, delay);
+      return;
+    }
+
+    stopPolling();
+    setRunning(false);
+    if (job.status === 'failed') {
+      const { msg, action, actionLabel } = humanRunError(job.error);
+      $('results').innerHTML = `<div class="banner errb" role="alert">
+        <strong>⚠️ ${esc(msg)}</strong>
+        ${action ? `<button type="button" class="linkbtn" onclick="goTab('${action}')">${esc(actionLabel)}</button>` : ''}
+        <details><summary>Technical details</summary><code>${esc(job.error || 'unknown')}</code></details>
+      </div>`;
+    } else {
+      renderApproval(job);
+      loadHud();
+    }
     loadJobs();
-  }, 1000);
+  };
+  polling = setTimeout(tick, delay);
+}
+
+function setRunStatus(html) {
+  const el = $('results').querySelector('.empty div:last-child');
+  if (el) el.innerHTML = html;
+}
+function stopPolling() { if (polling) { clearTimeout(polling); polling = null; } }
+
+/** Re-attach to a run after a refresh, so the operator doesn't re-run (and re-pay) for it. */
+async function reattachFromHash() {
+  const m = /run=([\w-]+)/.exec(location.hash || '');
+  if (!m) return false;
+  try {
+    const job = await api('/admin/api/jobs/' + m[1]);
+    if (job.status === 'processing') { setRunning(true, 'Reconnecting…'); trackRun(m[1], 'Run in progress…'); }
+    else if (job.summary) renderApproval(job);
+    return true;
+  } catch { return false; }
 }
 
 // ─── Approval room ──────────────────────────────────────────────────
@@ -487,11 +763,43 @@ function avatarStyle(name) {
 }
 function scoreClass(s) { return s >= 80 ? 'hi' : s >= 60 ? 'mid' : 'lo'; }
 const STATUS_BANNER = {
-  preview: ['info', '👀 Preview — nothing sent yet. Review below, uncheck anyone you don\'t want, then launch.'],
+  preview: ['info', '👀 Preview — nothing sent yet. Review below, tick the people you want, then launch.'],
   no_candidates: ['warnb', '🔍 No candidates were discovered for this search.'],
   no_emails: ['warnb', '📭 Candidates found, but none had a usable personal email.'],
   no_matches: ['warnb', '🎯 Candidates found, but none cleared the score threshold.'],
 };
+
+/**
+ * Diagnose an empty result and point at the control that caused it.
+ *
+ * Each empty state used to be a bare statement of fact on a screen where the operator had just
+ * spent real money. The app knows the threshold and every candidate's score, so "none cleared
+ * the threshold" can say WHICH threshold, what the best score actually was, and what to change.
+ */
+function emptyStateHelp(s) {
+  const v = st?.values || {};
+  if (s.status === 'no_matches') {
+    const best = (s.groups || []).flatMap((g) => g.candidates).reduce((m, c) => Math.max(m, c.score ?? 0), 0);
+    const bestTxt = s.bestScore ?? (best || null);
+    return `Your score threshold is <strong>${v.scoreThreshold ?? 60}</strong>.` +
+      (bestTxt ? ` The best of ${s.enriched} candidates scored <strong>${Math.round(bestTxt)}</strong>.` : '') +
+      ` Lower the threshold to see more, or widen the role's search titles.` +
+      `<button type="button" class="linkbtn" onclick="goTab('scoring')">Adjust threshold</button>`;
+  }
+  if (s.status === 'no_emails') {
+    return (v.personalOnly !== false
+      ? `<strong>Personal emails only</strong> is on, so work addresses were discarded — that's the usual cause. `
+      : '') +
+      `SalesQL had no personal address on file for these ${s.discovered} people.` +
+      `<button type="button" class="linkbtn" onclick="goTab('scoring')">Review settings</button>`;
+  }
+  if (s.status === 'no_candidates') {
+    return `Apollo returned nobody. Check the location spelling and the job titles — and note that the ` +
+      `<strong>seniority filter</strong> silently excludes anyone outside it.` +
+      `<button type="button" class="linkbtn" onclick="goTab('scoring')">Check filters</button>`;
+  }
+  return '';
+}
 
 function candCard(c) {
   const blocked = c.blocked;
@@ -522,27 +830,50 @@ function candCard(c) {
     detail += `<div class="bars">${bar('AI fit', b.aiFit)}${bar('Skills', b.skills)}${bar('Seniority', b.seniority)}${bar('Pedigree', b.pedigree)}</div>`;
   }
   if (c.linkedinUrl) detail += `<div class="hint" style="margin-top:.5rem">🔗 ${esc(c.linkedinUrl)}</div>`;
-  if (!detail) detail = `<div class="hint">No extra detail (add an Anthropic key for AI reasoning).</div>`;
+  // A single-company search never scores anyone (previewSearch doesn't call matchCandidates), so
+  // blaming a missing Anthropic key sent operators to buy a key that cannot fix it. Say what's
+  // actually true and point at the feature that does score.
+  if (!detail) {
+    detail = `<div class="hint">Single-company searches return contacts, not scored matches. Use <strong>Match whole pool</strong> for scores, AI reasoning and GitHub evidence.</div>`;
+  }
+  const uid = 'cand-' + Math.random().toString(36).slice(2, 9);
+  // The row is a <button>: it used to be a <div onclick>, which meant the score breakdown, AI
+  // reasoning and GitHub evidence were unreachable by keyboard — a keyboard-only operator could
+  // approve someone they were structurally prevented from evaluating.
   return `<div class="cand ${blocked ? 'blocked' : ''}" data-email="${esc(c.email)}">
-    <div class="cand-row" onclick="toggleCand(this)">
-      <input type="checkbox" class="chk" ${blocked ? 'disabled' : 'checked'} onclick="event.stopPropagation();updateApproveCount()">
-      <div class="av" style="${avatarStyle(c.name)}">${esc(initials(c.name))}</div>
-      <div class="meta"><div class="nm">${esc(c.name)} ${c.github && c.github.matched ? '<span class="gh-flag" title="GitHub matched">🐙</span>' : ''} ${badge}</div>
-        <div class="rl">${esc(c.role || '')}${c.company ? ' · ' + esc(c.company) : ''}</div>
-        <div class="em">${esc(c.email)}</div></div>
-      ${scoreHtml}<div class="caret">▸</div>
+    <div class="cand-row">
+      <input type="checkbox" class="chk" id="${uid}-chk" ${blocked ? 'disabled' : ''}
+        aria-label="Approve ${esc(c.name)} (${esc(c.email)}) for outreach">
+      <button type="button" class="cand-open" aria-expanded="false" aria-controls="${uid}-d">
+        <div class="av" style="${avatarStyle(c.name)}" aria-hidden="true">${esc(initials(c.name))}</div>
+        <div class="meta"><div class="nm">${esc(c.name)} ${c.github && c.github.matched ? '<span class="gh-flag" title="GitHub matched">🐙</span>' : ''} ${badge}</div>
+          <div class="rl">${esc(c.role || '')}${c.company ? ' · ' + esc(c.company) : ''}</div>
+          <div class="em">${esc(c.email)}</div></div>
+        ${scoreHtml}<div class="caret" aria-hidden="true">▸</div>
+      </button>
     </div>
-    <div class="detail">${detail}</div>
+    <div class="detail" id="${uid}-d">${detail}</div>
   </div>`;
 }
-function toggleCand(row) { row.closest('.cand').classList.toggle('open'); }
+
+// Delegated handlers — cards are re-rendered on every run.
+document.addEventListener('click', (e) => {
+  const opener = e.target.closest('.cand-open');
+  if (opener) {
+    const cand = opener.closest('.cand');
+    const open = cand.classList.toggle('open');
+    opener.setAttribute('aria-expanded', String(open));
+  }
+  if (e.target.classList?.contains('chk')) updateApproveCount();
+});
 
 function renderApproval(job) {
   const s = job.summary || {};
   currentPreview = job.id;
   $('results-sub').textContent = s.cost ? `est. $${s.cost.total.toFixed(2)}` : '';
   const [cls, msg] = STATUS_BANNER[s.status] || ['info', s.status || 'Done.'];
-  let html = `<div class="banner ${cls}">${msg}</div>`;
+  const help = emptyStateHelp(s);
+  let html = `<div class="banner ${cls}">${msg}${help ? `<div class="banner-help">${help}</div>` : ''}</div>`;
   const preTile = (s.kind === 'pool' && s.prescreened != null)
     ? `<div class="stat"><div class="n">${s.prescreened}</div><div class="l">top finalists</div></div>` : '';
   html += `<div class="stats">
@@ -557,26 +888,78 @@ function renderApproval(job) {
   if (s.aiUsed === false && s.kind === 'pool') html += `<p class="hint" style="margin:-.4rem 0 .6rem">AI fit scoring is off (no Anthropic key) — scores use skills/seniority/pedigree only.</p>`;
 
   const groups = s.groups || [];
-  if (job.commit) html = commitBanner(job.commit) + html;
+  if (job.commit) html = commitBanner(job.commit, job.id) + html;
   for (const g of groups) {
     html += `<div class="group-title">${esc(g.company)}${g.roleTitle ? ' — ' + esc(g.roleTitle) : ''}<span class="muted">· ${g.candidates.length}</span></div>`;
     html += g.candidates.map(candCard).join('');
   }
   if (groups.length && !job.commit) {
     const dry = liveMode ? '' : ' (dry run — safe)';
+    // Nobody is pre-selected. Every candidate used to render CHECKED, so the default gesture —
+    // click the one glowing CTA — emailed 25 strangers the operator never opened a card for.
+    // Selecting is now the deliberate act, and the bulk buttons keep that cheap.
     html += `<div class="approvebar">
       <span class="n" id="approve-count">0 selected</span>
+      <button type="button" class="linkbtn" id="select-all">Select all</button>
+      <button type="button" class="linkbtn" id="select-none">Clear</button>
+      <button type="button" class="linkbtn" id="select-top">Top 5 by score</button>
       <div class="spacer" style="flex:1"></div>
       <button class="cta" id="launch-btn" onclick="launch()">🚀 Launch approved${esc(dry)}</button>
     </div>`;
   }
   $('results').innerHTML = html;
+  wireBulkSelect(s);
   updateApproveCount();
 }
-function commitBanner(r) {
+
+/** Bulk selection. Only ever touches enabled boxes — blocked people stay blocked. */
+function wireBulkSelect(summary) {
+  const boxes = () => [...document.querySelectorAll('.cand:not(.blocked) .chk:not(:disabled)')];
+  const set = (list, on) => { list.forEach((b) => { b.checked = on; }); updateApproveCount(); };
+  $('select-all')?.addEventListener('click', () => set(boxes(), true));
+  $('select-none')?.addEventListener('click', () => set(boxes(), false));
+  $('select-top')?.addEventListener('click', () => {
+    // Rank by the score shown on the card, best first, and take the top 5.
+    const scored = (summary.groups || []).flatMap((g) => g.candidates)
+      .filter((c) => !c.blocked && c.score != null)
+      .sort((a, b) => b.score - a.score).slice(0, 5).map((c) => String(c.email).toLowerCase());
+    set(boxes(), false);
+    for (const b of boxes()) {
+      const email = b.closest('.cand')?.dataset.email?.toLowerCase();
+      if (scored.includes(email)) b.checked = true;
+    }
+    updateApproveCount();
+  });
+}
+function commitBanner(r, jobId) {
+  // A commit record now has three shapes, and this used to assume the happy one — reading
+  // r.campaigns.length off an in-flight or interrupted claim would throw and blank the view.
+  if (r.status === 'in_progress') {
+    return `<div class="banner info" role="status"><span class="spinner"></span> Launching… don't close this tab.</div>`;
+  }
+  if (r.status === 'interrupted') {
+    return `<div class="banner errb" role="alert">
+      <strong>⚠️ This launch was interrupted.</strong>
+      <div class="banner-help">${esc(r.error || '')}
+        <button type="button" class="linkbtn" onclick="releaseCommit('${esc(jobId)}')">I've checked Instantly — let me retry</button>
+      </div></div>`;
+  }
   const skipped = Object.entries(r.skipped || {}).filter(([, v]) => v).map(([k, v]) => `${v} ${k}`).join(', ');
   const verb = r.dryRun ? 'would send' : 'sent';
-  return `<div class="banner good">✅ ${verb} to ${r.sent} candidate${r.sent === 1 ? '' : 's'} across ${r.campaigns.length} campaign${r.campaigns.length === 1 ? '' : 's'}${skipped ? ` · skipped ${skipped}` : ''}.</div>`;
+  const campaigns = (r.campaigns || []).length;
+  return `<div class="banner good">✅ ${verb} to ${r.sent} candidate${r.sent === 1 ? '' : 's'} across ${campaigns} campaign${campaigns === 1 ? '' : 's'}${skipped ? ` · skipped ${skipped}` : ''}.</div>`;
+}
+
+/** Clear a stuck claim after the operator confirms they've verified Instantly themselves. */
+async function releaseCommit(jobId) {
+  if (!confirm('Only do this after checking Instantly.\n\nIf the interrupted launch DID create campaigns, retrying will email those people a second time.\n\nClear the lock and allow a retry?')) return;
+  try {
+    await api(`/admin/api/commit/${jobId}/release`, { method: 'POST' });
+    toast('Lock cleared — you can launch again.');
+    renderApproval(await api('/admin/api/jobs/' + jobId));
+  } catch (err) {
+    showError('Could not clear the lock', err);
+  }
 }
 function checkedEmails() { return [...document.querySelectorAll('.cand .chk:checked')].map((c) => c.closest('.cand').dataset.email); }
 function updateApproveCount() {
@@ -584,17 +967,51 @@ function updateApproveCount() {
   el.textContent = `${n} selected`;
   const btn = $('launch-btn'); if (btn) btn.disabled = n === 0;
 }
+let launching = false; // guards against a double-submit racing the server's own claim
+
 async function launch() {
+  if (launching) return;
   const approved = checkedEmails();
-  if (!approved.length) return toast('Select at least one candidate.');
+  if (!approved.length) return toast('Select at least one candidate first.');
   if (liveMode && !st.keys?.instantly?.set) { toast('Add your Instantly key to actually send outreach.'); return goTab('keys'); }
-  if (liveMode && !confirm(`⚠️ LIVE MODE\n\nCreate real Instantly campaign(s) and email ${approved.length} candidate(s) now?\n\nTurn on Dry run under Scoring for a safe preview.`)) return;
-  const btn = $('launch-btn'); if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Launching…'; }
-  const r = await api('/admin/api/commit', { method: 'POST', body: JSON.stringify({ requestId: currentPreview, approved }) });
-  if (!r.ok) { toast('Error: ' + r.error); if (btn) { btn.disabled = false; btn.textContent = '🚀 Launch approved'; } return; }
-  const job = await api('/admin/api/jobs/' + currentPreview);
-  renderApproval(job); loadJobs(); loadHud();
-  toast(r.result.dryRun ? 'Dry run complete — nothing sent.' : `Launched to ${r.result.sent}.`);
+
+  // Re-read live mode from the server rather than trusting the value cached at page load —
+  // dryRun may have been flipped in another tab since.
+  let live = liveMode;
+  try { live = !(await api('/admin/api/status')).dryRun; } catch { /* fall back to the cached value */ }
+
+  // Name names. This is irreversible, costs money, and reaches real people; a bare count is not
+  // informed consent. The names come from the cards the operator is looking at.
+  if (live) {
+    const names = approved.slice(0, 12).join('\n  • ');
+    const more = approved.length > 12 ? `\n  …and ${approved.length - 12} more` : '';
+    if (!confirm(`⚠️  LIVE — these are real emails to real people.\n\n` +
+      `Email ${approved.length} candidate(s) now?\n\n  • ${names}${more}\n\n` +
+      `This cannot be undone. Switch Dry run on under Scoring for a safe rehearsal.`)) return;
+  }
+
+  launching = true;
+  clearError();
+  const btn = $('launch-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Launching…'; }
+  try {
+    const r = await api('/admin/api/commit', { method: 'POST', body: JSON.stringify({ requestId: currentPreview, approved }) });
+    const job = await api('/admin/api/jobs/' + currentPreview);
+    renderApproval(job); loadJobs(); loadHud();
+    toast(r.result.dryRun ? 'Dry run complete — nothing sent.' : `Launched to ${r.result.sent}.`);
+  } catch (err) {
+    // A 409 means the server's claim already fired — the run IS committing or has committed.
+    // Re-render from the server rather than inviting a retry that could double-send.
+    if (err.status === 409) {
+      showError('Already launched', err);
+      try { renderApproval(await api('/admin/api/jobs/' + currentPreview)); } catch { /* keep the error visible */ }
+    } else {
+      showError('Launch failed — check the Runs tab before retrying', err);
+      if (btn) { btn.disabled = false; btn.textContent = '🚀 Launch approved'; }
+    }
+  } finally {
+    launching = false;
+  }
 }
 
 // ─── HUD (funnel + spend) ───────────────────────────────────────────
@@ -613,30 +1030,66 @@ async function loadHud() {
 
 // ─── Safety tab ─────────────────────────────────────────────────────
 async function loadSafety() {
-  const d = await api('/admin/api/suppression');
+  let d;
+  try { d = await api('/admin/api/suppression'); }
+  catch (err) { return showError('Could not load the safety lists', err); }
   $('contact-count').textContent = `${d.contactCount} people contacted all-time`;
-  const chip = (v) => `<span class="supp-item">${esc(v)}<button onclick="removeSupp('${esc(v)}')" title="Remove">✕</button></span>`;
-  $('supp-emails-wrap').innerHTML = `<label>Emails</label><div class="supp-list">${(d.emails||[]).map(chip).join('') || '<span class="muted status">none</span>'}</div>`;
-  $('supp-domains-wrap').innerHTML = `<label>Domains</label><div class="supp-list">${(d.domains||[]).map(chip).join('') || '<span class="muted status">none</span>'}</div>`;
+  // data-v + a delegated listener instead of building a JS string literal inside an attribute.
+  // Escaping the value is necessary but fragile; not generating code from data is the fix.
+  const chip = (v) => `<span class="supp-item">${esc(v)}<button class="supp-x" data-v="${esc(v)}" aria-label="Remove ${esc(v)} from the do-not-contact list">✕</button></span>`;
+  $('supp-emails-wrap').innerHTML = `<div class="navlabel" id="supp-emails-h">Emails</div><div class="supp-list" role="list" aria-labelledby="supp-emails-h">${(d.emails||[]).map(chip).join('') || '<span class="muted status">none</span>'}</div>`;
+  $('supp-domains-wrap').innerHTML = `<div class="navlabel" id="supp-domains-h">Domains</div><div class="supp-list" role="list" aria-labelledby="supp-domains-h">${(d.domains||[]).map(chip).join('') || '<span class="muted status">none</span>'}</div>`;
   $('audit').innerHTML = (d.recent || []).map((r) =>
     `<tr><td class="muted">${esc((r.at||'').replace('T',' ').slice(0,16))}</td><td>${esc(r.email)}</td><td>${esc(r.company)}</td><td class="muted">${esc(r.role)}</td></tr>`
   ).join('') || '<tr><td colspan="4" class="muted">No contacts recorded yet.</td></tr>';
 }
 async function addSupp() {
   const v = $('supp-add').value.trim(); if (!v) return;
-  await api('/admin/api/suppression', { method: 'POST', body: JSON.stringify({ add: v }) });
-  $('supp-add').value = ''; toast('Added to do-not-contact.'); loadSafety();
+  // Echo the interpretation back before committing: anything without an "@" blocks a WHOLE
+  // domain, so a plausible-looking "gmail.com" would silently blackhole most future runs
+  // (personalOnly targets exactly those inboxes) with no warning and no obvious way back.
+  if (!v.includes('@') || v.startsWith('@')) {
+    const domain = v.replace(/^@/, '');
+    if (!confirm(`Block the entire domain "${domain}"?\n\nEvery current and future candidate with an address @${domain} will be excluded from all outreach.\n\nTo block one person, enter their full email address instead.`)) return;
+  }
+  clearError();
+  try {
+    await api('/admin/api/suppression', { method: 'POST', body: JSON.stringify({ add: v }) });
+    $('supp-add').value = '';
+    toast('Added to do-not-contact.');
+    loadSafety();
+  } catch (err) {
+    // The server explains exactly what's wrong ("john is not a valid email address or domain").
+    showError('Could not add to the do-not-contact list', err);
+  }
 }
+// Delegated: the chips are rebuilt on every load, and inline handlers were how the XSS got in.
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.supp-x');
+  if (btn) removeSupp(btn.dataset.v);
+});
+
 async function removeSupp(v) {
-  await api('/admin/api/suppression', { method: 'POST', body: JSON.stringify({ remove: v }) });
-  toast('Removed.'); loadSafety();
+  // This card promises "anyone here is never emailed". Revoking that protection for someone who
+  // may have unsubscribed or complained should not be a silent, undoable 12px click.
+  if (!confirm(`Remove ${v} from the do-not-contact list?\n\nThey will be eligible for outreach again.`)) return;
+  try {
+    await api('/admin/api/suppression', { method: 'POST', body: JSON.stringify({ remove: v }) });
+    toast('Removed from do-not-contact.');
+    loadSafety();
+  } catch (err) {
+    showError('Could not remove ' + v, err);
+  }
 }
 
 // ─── Settings / keys / pool / jobs ──────────────────────────────────
 function renderKeys(keys) {
   $('keys').innerHTML = KEY_SERVICES.map(([k, label]) => {
     const set = keys[k]?.set; const hint = set ? `saved ••••${keys[k].last4}` : 'not set';
-    return `<div class="keyrow"><label style="margin:0">${label}</label><input id="key-${k}" type="password" placeholder="${hint}">
+    // for/id + autocomplete=off: these were unlabelled password fields, so a screen reader
+    // announced five identical "edit text, protected" rows with no way to tell them apart.
+    return `<div class="keyrow"><label style="margin:0" for="key-${k}">${esc(label)}</label>
+      <input id="key-${k}" type="password" autocomplete="off" placeholder="${esc(hint)}" aria-describedby="keystat-${k}">
       <span class="status" id="keystat-${k}">${set ? '<span class=ok>saved</span>' : '<span class=muted>—</span>'}</span></div>`;
   }).join('');
 }
@@ -650,7 +1103,9 @@ async function loadImpl() {
   $('seniorities').value = (v.seniorities || []).join(', '); $('testCompanyNames').value = (v.testCompanyNames || []).join(', ');
   const pool = await api('/admin/api/pool');
   $('companies').value = JSON.stringify(pool.companies, null, 2); $('tiers').value = JSON.stringify(pool.tiers, null, 2);
-  $('webhook-url').textContent = location.origin + '/webhook/candidate-finder?secret=YOUR_WEBHOOK_SECRET';
+  // Header, not a query string — the server stopped accepting ?secret= because a URL-borne
+  // credential leaks into every log on the path.
+  $('webhook-url').textContent = location.origin + '/webhook/candidate-finder';
   loadStatus(); loadJobs(); loadHud();
 }
 let liveMode = false;
@@ -660,13 +1115,26 @@ async function loadStatus() {
   st = await api('/admin/api/status');
   liveMode = !st.dryRun && !st.demo;
   const k = st.keys;
-  const dot = (ok) => ok ? '<span class=ok>●</span>' : '<span class=bad>●</span>';
-  const keyPill = (set, label) => `<span class="pill click" onclick="goTab('keys')">${dot(set)} ${label}</span>`;
+  // Distinct GLYPHS, not just colour, plus a spoken state. This was a green ● vs a red ● —
+  // identical character, identical text, so a screen reader announced "black circle, Apollo"
+  // either way, and red/green is the worst possible pairing for deuteranopia (~8% of men).
+  // The readiness panel is the operator's answer to "am I ready to run?".
+  const mark = (state) => state === 'ok' ? '<span class=ok aria-hidden="true">✓</span>'
+    : state === 'warn' ? '<span class=warn aria-hidden="true">○</span>'
+      : '<span class=bad aria-hidden="true">✕</span>';
+  const said = (state) => state === 'ok' ? 'connected' : state === 'warn' ? 'optional, not set' : 'not set';
+  // <button>, not <span onclick>: the whole status→fix navigation was mouse-only.
+  const pill = (state, label, tab, extra = '') =>
+    `<button type="button" class="pill click" onclick="goTab('${tab}')" aria-label="${esc(label)}: ${said(state)}. Go to settings.">
+      ${mark(state)} ${esc(label)}${extra}</button>`;
+  const keyPill = (set, label) => pill(set ? 'ok' : 'bad', label, 'keys');
+
   $('status').innerHTML = `<div class="statusgrid">
     ${keyPill(k.apollo.set, 'Apollo')}${keyPill(k.salesql.set, 'SalesQL')}${keyPill(k.instantly.set, 'Instantly')}
-    <span class="pill click" onclick="goTab('keys')">${k.anthropic.set ? '<span class=ok>●</span>' : '<span class=warn>●</span>'} Anthropic</span>
-    <span class="pill click" onclick="goTab('companies')">${dot(st.pool.ok)} Pool — ${esc(st.pool.detail)}</span>
-    <span class="pill click" onclick="goTab('scoring')">${st.dryRun ? '<span class=warn>DRY RUN</span>' : '<span class=ok>LIVE</span>'}</span>
+    ${pill(k.anthropic.set ? 'ok' : 'warn', 'Anthropic', 'keys')}
+    ${pill(st.pool.ok ? 'ok' : 'bad', 'Pool', 'companies', ' — ' + esc(st.pool.detail))}
+    <button type="button" class="pill click" onclick="goTab('scoring')" aria-label="Sending mode: ${st.dryRun ? 'dry run, nothing is sent' : 'LIVE, real emails are sent'}">
+      ${st.dryRun ? '<span class=warn>◑ DRY RUN</span>' : '<span class=ok>● LIVE</span>'}</button>
     ${st.demo ? '<span class="pill warn">DEMO MODE</span>' : ''}</div>`;
   renderSetup();
 }
@@ -733,29 +1201,74 @@ async function saveSettings() {
 async function savePool() {
   let companies, tiers;
   try { companies = JSON.parse($('companies').value); tiers = JSON.parse($('tiers').value); }
-  catch (e) { return toast('Invalid JSON: ' + e.message); }
-  const r = await api('/admin/api/pool', { method: 'POST', body: JSON.stringify({ companies, tiers }) });
+  catch (e) { return showError('That JSON has a syntax error', e); }
+  clearError();
+  let r;
+  try { r = await api('/admin/api/pool', { method: 'POST', body: JSON.stringify({ companies, tiers }) }); }
+  catch (err) { return showError('Could not save the pool', err); }
   if (r.ok) { toast('Pool saved.'); loadStatus(); } else toast('Rejected: ' + r.error);
 }
 let lastJobs = [];
 async function loadJobs() {
-  const { jobs } = await api('/admin/api/jobs'); lastJobs = jobs || [];
+  let jobs;
+  try { ({ jobs } = await api('/admin/api/jobs')); }
+  catch (err) { return showError('Could not load runs', err); }
+  lastJobs = jobs || [];
   $('jobs').innerHTML = lastJobs.map((j, i) => {
     const s = j.summary; const cost = s?.cost ? '$' + s.cost.total.toFixed(2) : '';
-    let result = j.error || '';
-    if (s) result = j.commit ? `sent ${j.commit.sent}` : `${s.status === 'preview' ? (s.matched ?? 0) + ' to review' : esc(s.status || '')}`;
+    // `status` was in the payload and never used, so an in-flight run — which has no summary and
+    // no error — rendered as a completely BLANK row, and clicking it said "No candidates for
+    // this run." The console was telling the operator their running job had found nothing.
+    let result = j.error ? 'failed' : '';
+    let cls = 'muted';
+    if (j.status === 'processing') {
+      result = '<span class="spinner"></span> running…';
+    } else if (j.commit?.status === 'in_progress') {
+      result = '<span class="spinner"></span> launching…';
+    } else if (j.commit?.status === 'interrupted') {
+      // Do NOT render this as a green success. A commit record has three shapes, and assuming
+      // the happy one printed "sent undefined" in green for a launch that actually needs
+      // verifying in Instantly.
+      result = '⚠️ interrupted — check Instantly';
+      cls = 'bad';
+    } else if (j.commit) {
+      result = `sent ${j.commit.sent ?? 0}`;
+      cls = 'ok';
+    } else if (s) {
+      result = s.status === 'preview' ? `${s.matched ?? 0} to review` : esc(s.status || '');
+    }
     return `<tr class="clickable" data-i="${i}"><td class="muted">${esc((j.createdAt||'').replace('T',' ').slice(0,16))}</td>
-      <td>${esc(j.company||'')}</td><td class="${j.commit ? 'ok' : 'muted'}">${esc(result)}</td><td class="muted">${cost}</td></tr>`;
+      <td>${esc(j.company||'')}</td><td class="${cls}">${result}</td><td class="muted">${cost}</td></tr>`;
   }).join('') || '<tr><td colspan="4" class="muted">No runs yet.</td></tr>';
 }
 $('jobs').addEventListener('click', (e) => {
   const tr = e.target.closest('tr[data-i]'); if (!tr) return;
   const job = lastJobs[Number(tr.dataset.i)];
-  if (!job?.summary?.groups) return toast(job?.error ? 'Run failed: ' + job.error : 'No candidates for this run.');
-  document.querySelector('nav.tabs button[data-tab="dashboard"]').click();
+  // Clicking a RUNNING job re-attaches the poller instead of lying about it.
+  if (job?.status === 'processing') {
+    selectTab('dashboard');
+    setRunning(true, 'Reconnecting…');
+    trackRun(job.id, 'Run in progress…');
+    return $('results-card').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  if (job?.status === 'failed') {
+    const { msg } = humanRunError(job.error);
+    return showError('That run failed', new Error(msg));
+  }
+  if (!job?.summary?.groups) return toast('No candidates for this run.');
+  selectTab('dashboard');
   renderApproval(job); $('results-card').scrollIntoView({ behavior: 'smooth', block: 'center' });
 });
-load();
+
+// Restore the tab from the URL, and re-attach to an in-flight run if there is one — a refresh
+// used to silently orphan the run (still billing) and reset the room to "No preview yet",
+// whose natural response is to click Preview again and pay twice.
+(async function boot() {
+  await load();
+  const reattached = await reattachFromHash();
+  const tab = (location.hash || '').replace('#', '');
+  if (!reattached && ['dashboard','keys','scoring','companies','safety','runs'].includes(tab)) selectTab(tab);
+})();
 </script>
 </body>
 </html>

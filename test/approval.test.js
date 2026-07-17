@@ -78,13 +78,26 @@ test('dry-run commit sends nothing to providers but reports would-add', async ()
 });
 
 test('previewPool matches against the pool and surfaces scores', async () => {
-  const s = await previewPool(quiet, providers());
+  // The old version of this test used the "Estimator" fixture and wrapped every assertion in
+  // `if (s.groups.length)`. Estimators cannot match a software-engineering pool at threshold 60,
+  // so groups was always empty, the body never ran, and the test asserted NOTHING while green.
+  // Use candidates that genuinely match the example pool, and assert the match unconditionally.
+  const engineers = [
+    {
+      firstName: 'Grace', lastName: 'Hopper', fullName: 'Grace Hopper', title: 'Senior Backend Engineer',
+      seniority: 'senior', company: 'Stripe', headline: 'Go, Kubernetes, PostgreSQL, AWS, microservices',
+      linkedinUrl: 'lk-grace', location: 'New York, New York',
+    },
+  ];
+  const s = await previewPool(quiet, providers({ discoverCandidates: async () => engineers }));
+
   assert.equal(s.kind, 'pool');
-  // example pool has roles; matched candidates carry a numeric score
-  if (s.groups.length) {
-    const c = s.groups[0].candidates[0];
-    assert.equal(typeof c.score, 'number');
-  }
+  assert.ok(s.groups.length > 0, `expected a match but got status "${s.status}" with no groups`);
+  const c = s.groups[0].candidates[0];
+  assert.equal(typeof c.score, 'number', 'a matched candidate must carry a numeric score');
+  assert.ok(c.score >= 60, `score ${c.score} should clear the default threshold`);
+  assert.ok(c.breakdown, 'the operator needs the score breakdown to review the match');
+  assert.equal(typeof c.breakdown.skills, 'number');
 });
 
 test('previewPool enriches ONLY the top finalists, not the whole wide net', async () => {

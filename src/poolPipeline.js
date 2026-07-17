@@ -7,9 +7,11 @@
 // the demo fakes, or test mocks.
 import { getSettings } from './settings.js';
 import { loadPool, loadCompanyTiers } from './pool.js';
-import { matchCandidates, groupByCompany, preRank } from './matcher.js';
+import { matchCandidates, groupByCompanyRole, preRank } from './matcher.js';
 import { mapLimit } from './http.js';
 import { defaultProviders } from './pipeline.js';
+import { screenForSend } from './sendGate.js';
+import { recordContacts } from './contacts.js';
 
 export async function runPoolPipeline(log, providers = defaultProviders) {
   const p = { ...defaultProviders, ...providers };
@@ -57,9 +59,13 @@ export async function runPoolPipeline(log, providers = defaultProviders) {
   summary.prescreened = finalists.length;
   summary.enrichAttempts = finalists.length;
 
-  // [3] Enrich ONLY the finalists (the paid step). Drop anyone we can't reach.
-  const enriched = (await p.enrichCandidates(finalists, log)).filter((c) => c.email);
+  // [3] Enrich ONLY the finalists (the paid step). Drop anyone we can't reach, then run the
+  //     do-not-contact + recently-contacted gate. This path auto-sends with no human review,
+  //     so the gate is the ONLY thing standing between a suppressed address and an email.
+  const withEmail = (await p.enrichCandidates(finalists, log)).filter((c) => c.email);
+  const { sendable: enriched, skipped } = screenForSend(withEmail, { log });
   summary.enriched = enriched.length;
+  summary.skipped = skipped;
 
   // [3b] Attach real GitHub engineering signal (best-effort) before scoring.
   if (typeof p.enrichGithub === 'function') {
@@ -87,25 +93,32 @@ export async function runPoolPipeline(log, providers = defaultProviders) {
     return summary;
   }
 
-  // [4] One campaign per company.
-  const groups = groupByCompany(matches);
+  // [4] One campaign per (company, role) — a company with two open roles needs two campaigns,
+  //     or the second role's candidates get pitched the first role's job and salary.
+  const groups = groupByCompanyRole(matches);
   for (const group of groups) {
     const companyName = group.company.name;
+    const roleTitle = group.role.title;
     const leads = group.matches.map((m) => toLead(m));
 
     if (config.dryRun) {
       summary.campaigns.push({
-        company: companyName, dryRun: true, matched: leads.length,
+        company: companyName, role: roleTitle, dryRun: true, matched: leads.length,
         top: leads.slice(0, 5).map((l) => ({ name: l.fullName, email: l.email, score: l.score, role: l.title })),
       });
       continue;
     }
 
-    const campaign = await p.createCampaign(companyName, log);
-    const form = { companyName, jobPosition: group.matches[0].role.title };
+    const campaign = await p.createCampaign(companyName, log, roleTitle);
+    const form = { companyName, jobPosition: roleTitle, jobSalary: group.role.salary || '' };
     const { added } = await p.addLeads(campaign.id, leads, form, log);
     const activated = await p.activateCampaign(campaign.id, log);
-    summary.campaigns.push({ company: companyName, campaignId: campaign.id, added, activated });
+    // Record the send. Without this the "immutable audit trail" silently omitted every pool
+    // run, and dedupeWindowDays could never fire for this path — it reads data nobody wrote.
+    recordContacts(leads.map((l) => ({
+      email: l.email, company: companyName, role: roleTitle, campaignId: campaign.id,
+    })));
+    summary.campaigns.push({ company: companyName, role: roleTitle, campaignId: campaign.id, added, activated });
   }
 
   summary.status = config.dryRun ? 'dry_run' : 'ok';
@@ -119,7 +132,12 @@ function toLead(match) {
   return {
     ...match.candidate,
     score: match.score,
-    title: match.role.title, // the role they're matched TO
+    // `title` stays the candidate's CURRENT job — it feeds the {{jobTitle}} variable, and the
+    // role they're being pitched already travels separately as {{rolePosition}}. This used to
+    // be overwritten with match.role.title, so {{jobTitle}} meant "their current job" in the
+    // approval path and "the job we're offering" here: the same variable, opposite meanings,
+    // and whichever way the copy was written, one of the two paths sent nonsense.
+    title: match.candidate.title,
     matchedRole: match.role.title,
     matchedCompany: match.role.company.name,
   };

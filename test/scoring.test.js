@@ -20,6 +20,15 @@ test('seniority: infers level from title when no explicit field', () => {
   assert.equal(seniorityScore({ title: 'Senior Frontend Engineer' }, role), 100);
 });
 
+test('seniority: title matching respects word boundaries', () => {
+  const role = { seniority: ['senior'] };
+  assert.equal(seniorityScore({ title: 'Sr. Backend Engineer' }, role), 100, '"Sr." is senior');
+  assert.equal(seniorityScore({ title: 'Senior Backend Engineer' }, role), 100);
+  // "MSR Engineer" ends in the letters "sr" but is not senior — the old regex said it was.
+  assert.ok(seniorityScore({ title: 'MSR Engineer' }, role) < 100, '"MSR" must not read as senior');
+  assert.ok(seniorityScore({ title: 'Advisr Analyst' }, role) < 100);
+});
+
 test('skills: full required match scores high, partial lower', () => {
   const full = skillsScore({ headline: 'React, TypeScript, GraphQL, Node.js' }, role);
   assert.ok(full.score >= 90);
@@ -43,6 +52,19 @@ test('pedigree: tier-1 employer scores highest, unknown neutral', () => {
   assert.ok(pedigreeScore({ company: 'Nowhere Inc' }, map).score < 70);
 });
 
+// Substring matching used to hand tier-1 pedigree to any company merely CONTAINING a listed
+// name — worth ~+11 on the deterministic overall, enough to clear the accept threshold.
+test('pedigree: matches whole words, not substrings (Metabase is not Meta)', () => {
+  const map = new Map([['meta', 1], ['apple', 1], ['intel', 3]]);
+  assert.equal(pedigreeScore({ company: 'Meta' }, map).score, 100, 'the real company still matches');
+  assert.equal(pedigreeScore({ company: 'Meta Platforms' }, map).score, 100, 'multi-word names still match');
+  for (const impostor of ['Metabase', 'Applebees', 'Intellect Design']) {
+    const r = pedigreeScore({ company: impostor }, map);
+    assert.equal(r.tier, null, `${impostor} must not inherit a tier by substring`);
+    assert.ok(r.score < 70, `${impostor} scored ${r.score} — should be the not-on-list default`);
+  }
+});
+
 test('composite: reweights to deterministic when AI is null', () => {
   const det = { overall: 72, seniority: 90, skills: 80, pedigree: 60 };
   const noAi = compositeScore(det, null);
@@ -52,6 +74,30 @@ test('composite: reweights to deterministic when AI is null', () => {
   const withAi = compositeScore(det, 100);
   assert.equal(withAi.usedAi, true);
   assert.ok(withAi.overall > noAi.overall); // a high AI score should pull the composite up
+});
+
+// An Anthropic blip used to PROMOTE the candidate it failed on: null fell back to the
+// reweighted deterministic score (72), which outranks the honest 4-weight score of a peer the
+// AI actually judged — and then claimed a capacity seat. A failure must never be a promotion.
+test('composite: an AI call that FAILS mid-run does not outrank an AI-rejected peer', () => {
+  const det = { overall: 72, seniority: 90, skills: 80, pedigree: 60 };
+
+  const aiRejected = compositeScore(det, 20, { aiAvailable: true });
+  const aiErrored = compositeScore(det, null, { aiAvailable: true });
+
+  assert.equal(aiErrored.aiFailed, true, 'a failed call must be flagged, not silently absorbed');
+  assert.equal(aiErrored.usedAi, false, 'no AI verdict was actually used');
+  assert.ok(
+    aiErrored.overall < det.overall,
+    `an AI error scored ${aiErrored.overall} — it must not inherit the deterministic 72`,
+  );
+  assert.ok(aiErrored.overall > aiRejected.overall, 'a neutral prior should still beat an explicit rejection');
+
+  // The distinction that matters: AI off for everyone is fair reweighting; AI on but broken
+  // for one candidate is a scale mismatch and must be scored on the shared 4-weight scale.
+  const aiDisabled = compositeScore(det, null, { aiAvailable: false });
+  assert.equal(aiDisabled.overall, 72);
+  assert.notEqual(aiErrored.overall, aiDisabled.overall);
 });
 
 test('deterministicScore blends the three signals into 0-100', () => {

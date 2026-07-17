@@ -54,11 +54,14 @@ Docker host works too.
 In GoHighLevel/Flowsa, set the Candidate Finder form's webhook/automation to **POST** to:
 
 ```
-https://<your-url>/webhook/candidate-finder?secret=YOUR_WEBHOOK_SECRET
+https://<your-url>/webhook/candidate-finder
 ```
 
-Replace `YOUR_WEBHOOK_SECRET` with the `WEBHOOK_SECRET` value from Part A (or send it as an
-`x-webhook-secret` header instead of the query string).
+Add a custom header `x-webhook-secret` with the `WEBHOOK_SECRET` value from Part A. Both
+GoHighLevel and Flowsa support custom webhook headers.
+
+> A `?secret=` query value is **not** accepted — a secret in a URL leaks into access logs, proxy
+> logs, browser history, and the `Referer` header.
 
 ---
 
@@ -66,7 +69,8 @@ Replace `YOUR_WEBHOOK_SECRET` with the `WEBHOOK_SECRET` value from Part A (or se
 
 1. Submit the form once with company name **"Test Company"** (this auto-forces dry-run — no email
    sent). In `/admin` → **Recent runs**, confirm the job appears and finishes.
-2. Or run the multi-company matcher: `POST https://<your-url>/run-pool?secret=YOUR_WEBHOOK_SECRET`
+2. Or run the multi-company matcher:
+   `curl -X POST -H "x-webhook-secret: YOUR_WEBHOOK_SECRET" https://<your-url>/run-pool`
    and watch it in **Recent runs**.
 3. When you're happy with the candidates/scores: in `/admin` set **Dry run = false** and Save.
    Real campaigns will now be created in Instantly on each run.

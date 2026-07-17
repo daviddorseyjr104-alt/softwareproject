@@ -1,5 +1,6 @@
 // Company-pedigree score (0-100), deterministic from the tier list (data/company-tiers.json).
 // Weights candidates who currently work at (or recently worked at) a strong company.
+import { mentions } from './text.js';
 
 /**
  * @param {object} candidate       has `company` (current employer name)
@@ -12,11 +13,16 @@ export function pedigreeScore(candidate, tierMap) {
     return { score: 60, tier: null, matchedCompany: null }; // unknown — neutral
   }
 
-  // Find the strongest (lowest-numbered) tier whose name fragment appears in the company.
+  // Find the strongest (lowest-numbered) tier whose name matches the company on WORD boundaries.
+  //
+  // A bare `company.includes(fragment)` handed tier-1 pedigree to any company whose name merely
+  // contained a listed one as a substring: "Metabase" matched "meta", "Applebees" matched
+  // "apple", "Intellect Design" matched "intel". That is +45 pedigree (100 vs 55), worth ~+11 on
+  // the deterministic overall — enough to push an unrelated candidate past the accept threshold.
   let best = null;
   let matched = null;
   for (const [fragment, tier] of tierMap) {
-    if (company.includes(fragment) && (best === null || tier < best)) {
+    if (mentions(company, fragment) && (best === null || tier < best)) {
       best = tier;
       matched = fragment;
     }

@@ -24,9 +24,46 @@ const list = (v) =>
     : String(v || '').split(',').map((s) => s.trim()).filter(Boolean);
 
 // ---- encryption ----------------------------------------------------------
+// AES-256-GCM with a scrypt-stretched key. Ciphertext framing: iv(12) | tag(16) | payload.
+//
+// The key is derived with scrypt rather than a bare SHA-256: settings.json is an offline
+// oracle (the GCM tag verifies each guess), so an unsalted single hash of a hand-typed
+// SECRET_KEY is GPU-brute-forceable at billions of guesses/sec. scrypt makes each guess cost
+// ~64MB of memory. The salt is stored next to the ciphertext — it defeats rainbow tables, and
+// is not itself a secret.
+const SCRYPT_PARAMS = { N: 2 ** 15, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
+const LEGACY_PREFIX = 'v1:'; // pre-KDF blobs, keyed by bare sha256(SECRET_KEY)
+
+let saltCache = null;
+
+/** Random per-store salt, persisted beside the secrets so the KDF is deterministic across boots. */
+function storeSalt() {
+  if (saltCache) return saltCache;
+  const store = readStore();
+  if (store.kdfSalt) {
+    saltCache = Buffer.from(store.kdfSalt, 'base64');
+  } else {
+    saltCache = crypto.randomBytes(16);
+    store.kdfSalt = saltCache.toString('base64');
+    writeStore(store);
+  }
+  return saltCache;
+}
+
+/** Derived 32-byte key. Cached — scrypt at these params takes ~100ms and runs per request. */
+let derivedKeyCache = null;
 function keyBytes() {
   if (!bootConfig.secretKey) return null;
-  return crypto.createHash('sha256').update(bootConfig.secretKey).digest(); // 32 bytes
+  if (!derivedKeyCache) {
+    derivedKeyCache = crypto.scryptSync(bootConfig.secretKey, storeSalt(), 32, SCRYPT_PARAMS);
+  }
+  return derivedKeyCache;
+}
+
+/** The old bare-sha256 key, retained only to read secrets written before the KDF landed. */
+function legacyKeyBytes() {
+  if (!bootConfig.secretKey) return null;
+  return crypto.createHash('sha256').update(bootConfig.secretKey).digest();
 }
 
 export function encryptSecret(plain) {
@@ -39,19 +76,33 @@ export function encryptSecret(plain) {
   return Buffer.concat([iv, tag, enc]).toString('base64');
 }
 
+function open(blob, key) {
+  const raw = Buffer.from(blob, 'base64');
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, raw.subarray(0, 12));
+  decipher.setAuthTag(raw.subarray(12, 28));
+  return Buffer.concat([decipher.update(raw.subarray(28)), decipher.final()]).toString('utf8');
+}
+
 export function decryptSecret(blob) {
-  const key = keyBytes();
-  if (!key || !blob) return '';
+  if (!blob || !bootConfig.secretKey) return '';
+  // Blobs written before the scrypt migration are tagged and opened with the old key, so an
+  // upgrade doesn't silently lock the operator out of their own saved API keys.
+  if (blob.startsWith(LEGACY_PREFIX)) {
+    try {
+      return open(blob.slice(LEGACY_PREFIX.length), legacyKeyBytes());
+    } catch {
+      return '';
+    }
+  }
   try {
-    const raw = Buffer.from(blob, 'base64');
-    const iv = raw.subarray(0, 12);
-    const tag = raw.subarray(12, 28);
-    const enc = raw.subarray(28);
-    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-    decipher.setAuthTag(tag);
-    return Buffer.concat([decipher.update(enc), decipher.final()]).toString('utf8');
+    return open(blob, keyBytes());
   } catch {
-    return ''; // wrong SECRET_KEY or corrupt blob → behave as "no key"
+    // Untagged blob that won't open under the new key: it predates the migration marker.
+    try {
+      return open(blob, legacyKeyBytes());
+    } catch {
+      return ''; // wrong SECRET_KEY or corrupt blob → behave as "no key"
+    }
   }
 }
 
@@ -60,13 +111,26 @@ function readStore() {
   if (!existsSync(SETTINGS_FILE)) return { version: 1, secrets: {}, values: {} };
   try {
     const parsed = JSON.parse(readFileSync(SETTINGS_FILE, 'utf8'));
-    return { version: 1, secrets: parsed.secrets || {}, values: parsed.values || {} };
+    // kdfSalt must survive a read-modify-write cycle: dropping it would derive a fresh salt on
+    // the next boot and render every persisted API key permanently undecryptable.
+    const store = { version: 1, secrets: parsed.secrets || {}, values: parsed.values || {} };
+    if (parsed.kdfSalt) store.kdfSalt = parsed.kdfSalt;
+    return store;
   } catch {
     return { version: 1, secrets: {}, values: {} };
   }
 }
 
 function writeStore(store) {
+  // Never let a write drop the KDF salt.
+  //
+  // Every caller here is a read-modify-write, and `updateSettings` reads the store BEFORE
+  // encryptSecret lazily mints and persists the salt — so its stale copy wrote straight back
+  // over it. The salt then lived only in `saltCache`, so everything worked until the next
+  // restart, at which point a fresh salt derived a different key and every saved API key
+  // decrypted to '' — silently, and unrecoverably. Enforcing it at the sink means no future
+  // caller has to remember.
+  if (!store.kdfSalt && saltCache) store.kdfSalt = saltCache.toString('base64');
   mkdirSync(bootConfig.dataDir, { recursive: true });
   const tmp = `${SETTINGS_FILE}.tmp`;
   writeFileSync(tmp, JSON.stringify(store, null, 2));
@@ -153,7 +217,51 @@ export function setDryRunOverride(value) {
  * @param {object} patch  e.g. { apolloApiKey, salesqlApiKey, instantlyApiKey, anthropicApiKey,
  *                               maxCandidates, weightAi, scoreThreshold, dryRun, ... }
  */
-export function updateSettings(patch = {}) {
+/**
+ * Bounds for operator-editable numbers.
+ *
+ * These are spend and safety limits, not cosmetics. `discoverLimit` was an unclamped
+ * `int(v, 100)` behind a bare number input: typing 10000 and hitting Save authorized a
+ * four-figure Apollo bill on the next Preview, with a cheerful "Settings saved." toast and no
+ * confirmation. A threshold of 500 silently made every future run return no_matches forever.
+ * Validate at the store, not the input — the API is reachable without the UI.
+ */
+const NUMERIC_BOUNDS = {
+  maxCandidates: { min: 1, max: 200, label: 'Finalists to enrich' },
+  discoverLimit: { min: 1, max: 500, label: 'Candidates to discover per role' },
+  scoreThreshold: { min: 0, max: 100, label: 'Score threshold' },
+  dedupeWindowDays: { min: 0, max: 3650, label: 'Dedupe window (days)' },
+  scheduleHours: { min: 0, max: 8760, label: 'Schedule (hours)' },
+  weightAi: { min: 0, max: 1, label: 'AI weight' },
+  weightSkills: { min: 0, max: 1, label: 'Skills weight' },
+  weightSeniority: { min: 0, max: 1, label: 'Seniority weight' },
+  weightPedigree: { min: 0, max: 1, label: 'Pedigree weight' },
+};
+
+function validatePatch(patch) {
+  for (const [key, bound] of Object.entries(NUMERIC_BOUNDS)) {
+    if (!(key in patch) || patch[key] === undefined || patch[key] === '') continue;
+    const n = Number(patch[key]);
+    if (!Number.isFinite(n)) throw new Error(`${bound.label} must be a number.`);
+    if (n < bound.min || n > bound.max) {
+      throw new Error(`${bound.label} must be between ${bound.min} and ${bound.max} (got ${n}).`);
+    }
+  }
+  // discoverLimit is the wide net we pre-rank down from; enriching more than we discovered is
+  // incoherent and would silently waste paid SalesQL lookups.
+  const discover = patch.discoverLimit ?? undefined;
+  const finalists = patch.maxCandidates ?? undefined;
+  if (discover !== undefined && finalists !== undefined && Number(finalists) > Number(discover)) {
+    throw new Error(`Finalists to enrich (${finalists}) cannot exceed candidates discovered per role (${discover}).`);
+  }
+  return patch;
+}
+
+export function updateSettings(patchInput = {}) {
+  validatePatch(patchInput);
+  // Work on a copy: the secret-stripping below used to `delete` keys from the caller's object,
+  // which is req.body on the admin route — a function that quietly rewrites its argument.
+  const patch = { ...patchInput };
   const store = readStore();
   const secretMap = {
     apolloApiKey: 'apollo',
@@ -172,7 +280,14 @@ export function updateSettings(patch = {}) {
     delete patch[patchKey];
   }
 
-  store.values = { ...store.values, ...stripUndefined(patch) };
+  // Only persist keys the app actually reads. Without an allowlist, any field a client posts is
+  // written to settings.json verbatim and kept forever.
+  const known = new Set([...Object.keys(NUMERIC_BOUNDS), 'seniorities', 'personalOnly', 'instantlyTimezone',
+    'instantlySendingFrom', 'instantlySendingTo', 'instantlyTemplateCampaignId', 'aiEffort', 'dryRun',
+    'testCompanyNames', 'enrichGithub']);
+  const accepted = Object.fromEntries(Object.entries(stripUndefined(patch)).filter(([k]) => known.has(k)));
+
+  store.values = { ...store.values, ...accepted };
   writeStore(store);
   cache = null;
   return getMaskedSettings();
@@ -219,8 +334,15 @@ export function getMaskedSettings() {
   };
 }
 
-/** Test-only: drop the in-memory cache so a fresh env/store is re-read. */
+/**
+ * Test-only: drop the in-memory caches so a fresh env/store is re-read.
+ * The salt/key caches must be cleared too — leaving them set makes an in-process test look like
+ * it works while a real restart (which has no caches) fails. That is exactly how the salt-clobber
+ * bug hid behind a green suite.
+ */
 export function _resetCache() {
   cache = null;
   dryRunOverride = undefined;
+  saltCache = null;
+  derivedKeyCache = null;
 }

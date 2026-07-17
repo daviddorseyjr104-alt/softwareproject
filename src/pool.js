@@ -36,6 +36,26 @@ function writeToDataDir(name, obj) {
   return target;
 }
 
+/**
+ * How many candidates this role may claim. Omitted → unlimited.
+ *
+ * The old check was `Number.isFinite(role.capacity) ? role.capacity : Infinity`, which is false
+ * for the STRING "2" — so a quoted number in the pool JSON silently meant *unlimited* rather
+ * than two. The admin UI ships a raw JSON editor, so that quote is one keystroke away, and the
+ * blast radius is a campaign to everyone who cleared the threshold instead of the top 2.
+ */
+function parseCapacity(role, company) {
+  if (role.capacity === undefined || role.capacity === null || role.capacity === '') return Infinity;
+  const n = Number(role.capacity);
+  if (!Number.isFinite(n) || n < 0 || !Number.isInteger(n)) {
+    throw new Error(
+      `Role "${role.id}" at "${company.name}" has capacity ${JSON.stringify(role.capacity)} — ` +
+      'it must be a whole number (e.g. 5, not "5"), or omitted for unlimited.',
+    );
+  }
+  return n;
+}
+
 /** Validate a pool object → { companies, roles }. Throws with a clear message on any problem. */
 export function validatePool(data) {
   const companies = Array.isArray(data?.companies) ? data.companies : [];
@@ -57,7 +77,7 @@ export function validatePool(data) {
         niceToHaveSkills: role.niceToHaveSkills || [],
         seniority: role.seniority || [],
         location: role.location || company.location || '',
-        capacity: Number.isFinite(role.capacity) ? role.capacity : Infinity,
+        capacity: parseCapacity(role, company),
         company: { id: company.id, name: company.name, tier: company.tier ?? 3 },
       });
     }

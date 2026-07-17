@@ -57,6 +57,48 @@ The `/admin` UI is a review console, not a fire-and-forget button:
 
 Built-in guardrails: a **do-not-contact list** (emails or whole domains), **cross-run dedup** (`DEDUPE_WINDOW_DAYS`), an **immutable contact audit trail**, per-run **cost estimates**, a lifetime **funnel**, and optional **scheduled sourcing** (`SCHEDULE_HOURS`) that generates previews for review without ever auto-sending.
 
+### One send gate — every path, no exceptions
+
+There are three ways a person can be emailed (the webhook, `npm run match`/`/run-pool`, and the
+admin approval room). All three go through a single chokepoint, [`src/sendGate.js`](src/sendGate.js),
+which applies the do-not-contact list and the dedupe window, and every send is written to the
+audit trail.
+
+This is deliberately one function rather than a rule each path re-implements. It used to be
+hand-copied, and the copy was missing from the pool pipeline — the one path that auto-sends with
+no human review — so a suppressed address was emailed by `/run-pool` while the whole test suite
+passed. [`test/sendPaths.test.js`](test/sendPaths.test.js) is table-driven over every send path
+for exactly that reason: a fourth path fails the suite until it routes through the gate.
+
+Approving someone does **not** override the gate. The approval room re-screens at send time,
+because a preview can be hours old and someone may have unsubscribed in between.
+
+### Two trust levels
+
+`WEBHOOK_SECRET` and the admin password are **not** interchangeable:
+
+| Credential | Can do | Cannot do |
+|---|---|---|
+| `WEBHOOK_SECRET` (shared with the form vendor) | trigger a run, read a **PII-free** job status | read any candidate's name, email, or LinkedIn URL |
+| `ADMIN_PASSWORD` (yours) | everything, including the full candidate detail | — |
+
+The webhook secret is handed to a third party and configured in their UI, so it authorizes
+*sending work*, never *reading people*. It must be sent as an `x-webhook-secret` **header**;
+`?secret=` is rejected because URLs leak into access logs, proxy logs, browser history, and the
+`Referer` header.
+
+### Fails closed
+
+The server **refuses to start** without `WEBHOOK_SECRET`, `ADMIN_PASSWORD`, and `SECRET_KEY`.
+Anything that isn't explicitly `NODE_ENV=development` or `test` counts as production, so a host
+that merely forgets to set `NODE_ENV` gets the strict check rather than an open console. To run
+open locally on purpose, set `ALLOW_INSECURE_DEV=1` (`npm run demo` does this for you).
+
+Concurrent runs are capped (`MAX_CONCURRENT_RUNS`, default 2; `MAX_QUEUED_RUNS`, default 8) and
+excess requests get `503` rather than a `202` that silently spends money. Discovery/enrichment
+limits are validated server-side, so a fat-fingered `discoverLimit` can't authorize a four-figure
+Apollo bill.
+
 ### Run the matcher
 
 ```bash
@@ -72,7 +114,7 @@ This runs as a hosted app the client configures themselves in a browser — no t
 1. Deploy to a managed host (Render config included). Full runbook: **[docs/DEPLOY.md](docs/DEPLOY.md)**.
 2. The client opens **`https://<your-host>/admin`** (password-protected), pastes *their own* API keys,
    clicks **Test keys** (✅/❌ per service), and edits their company/role list — all in the browser.
-3. They point their GoHighLevel/Flowsa form at `https://<your-host>/webhook/candidate-finder?secret=…`.
+3. They point their GoHighLevel/Flowsa form at `https://<your-host>/webhook/candidate-finder`, with the secret sent as an `x-webhook-secret` header.
 
 Keys are the client's own (their accounts, their billing) and are **stored encrypted at rest**. In
 production the app refuses to boot without its secrets, so it can't be left open by accident. Settings
@@ -130,7 +172,8 @@ npm run demo     # boots on :3999 with fake providers (DEMO mode)
 Then in another terminal:
 
 ```bash
-curl -X POST "http://localhost:3999/webhook/candidate-finder?secret=demo-secret" \
+curl -X POST "http://localhost:3999/webhook/candidate-finder" \
+  -H "x-webhook-secret: demo-secret" \
   -H "Content-Type: application/json" \
   -d '{"companyName":"Acme Builders","companyCity":"Denver","companyState":"Colorado","jobPositionName":"Senior Project Manager","positionsIAmLookingFor":"Project Manager, Estimator"}'
 ```
@@ -155,9 +198,12 @@ In GoHighLevel/Flowsa, set the form's webhook/automation to POST to:
 https://YOUR_HOST/webhook/candidate-finder
 ```
 
-Add authentication as **either**:
-- header `x-webhook-secret: <your WEBHOOK_SECRET>`, or
-- query string `?secret=<your WEBHOOK_SECRET>`
+Authenticate with the header `x-webhook-secret: <your WEBHOOK_SECRET>`. Both GoHighLevel and
+Flowsa support custom webhook headers.
+
+> A `?secret=` query value is **not** accepted. A secret in a URL leaks into access logs, proxy
+> and CDN logs, browser history, and the `Referer` header. This secret is also deliberately
+> scoped to *sending* only — it cannot read candidate PII (see the trust levels below).
 
 The webhook accepts JSON or url-encoded form posts and tolerates GHL's nested `customData`.
 It responds `202 Accepted` immediately, then runs the pipeline in the background (so the form

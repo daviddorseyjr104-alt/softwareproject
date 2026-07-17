@@ -45,12 +45,21 @@ function persist() {
   }
 }
 
-/** Whole-number days since this email was last contacted, or null if never. */
+/**
+ * Whole-number days since this email was last contacted, or null if never.
+ *
+ * A record with an unparseable `at` yields age 0, NOT NaN. NaN propagated into
+ * `recentlyContacted`, where `NaN < withinDays` is false — so a corrupt timestamp meant "not
+ * contacted recently" and the person got emailed again. A safety check must fail CLOSED: we
+ * know from the record's existence that they were contacted; if we can't tell when, assume it
+ * was just now and hold off.
+ */
 export function lastContactAgeDays(email) {
   const entry = latest.get(norm(email));
   if (!entry) return null;
-  const ms = Date.now() - new Date(entry.at).getTime();
-  return Math.floor(ms / DAY_MS);
+  const at = new Date(entry.at).getTime();
+  if (!Number.isFinite(at)) return 0; // corrupt timestamp → treat as contacted just now
+  return Math.max(0, Math.floor((Date.now() - at) / DAY_MS));
 }
 
 /** True if contacted within the last `withinDays` days. */

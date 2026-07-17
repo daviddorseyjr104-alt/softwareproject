@@ -6,12 +6,13 @@
 // auto-send pipelines; this one never sends without an explicit commit.
 import { getSettings } from './settings.js';
 import { loadPool, loadCompanyTiers } from './pool.js';
-import { matchCandidates, groupByCompany, preRank } from './matcher.js';
+import { matchCandidates, groupByCompanyRole, preRank } from './matcher.js';
 import { defaultProviders } from './pipeline.js';
 import { dedupeByEmail } from './pipeline.js';
 import { mapLimit } from './http.js';
 import { isSuppressed } from './suppression.js';
 import { lastContactAgeDays, recentlyContacted, recordContacts } from './contacts.js';
+import { screenForSend, dedupeWindow } from './sendGate.js';
 import { estimateCost } from './cost.js';
 
 const norm = (s) => String(s || '').trim().toLowerCase();
@@ -70,9 +71,11 @@ export async function previewPool(log, providers = defaultProviders) {
   summary.matched = matches.length;
   if (!matches.length) { summary.status = 'no_matches'; return finishPreview(summary); }
 
-  for (const group of groupByCompany(matches)) {
-    const roleTitle = group.matches[0].role.title;
-    const roleSalary = group.matches[0].role.salary || '';
+  // One group per (company, role) — every candidate in a group is matched to THAT role, so the
+  // title and salary the outreach quotes are the ones they were actually scored against.
+  for (const group of groupByCompanyRole(matches)) {
+    const roleTitle = group.role.title;
+    const roleSalary = group.role.salary || '';
     summary.groups.push({
       company: group.company.name,
       roleTitle,
@@ -144,15 +147,24 @@ export async function commit(summary, approvedEmails, log, providers = defaultPr
     skipped: { suppressed: 0, recent: 0, notApproved: 0 },
   };
 
+  // True from the moment ANY lead reaches Instantly. Tracked across the whole group loop, not
+  // derived from result.sent, because result.sent is only incremented after activateCampaign —
+  // leads are live and emailable well before that.
+  let anyLeadsLive = false;
+
   for (const group of summary.groups || []) {
-    // Filter to approved AND safe.
-    const leads = [];
-    for (const c of group.candidates) {
-      if (!approved.has(norm(c.email))) { result.skipped.notApproved++; continue; }
-      if (isSuppressed(c.email)) { result.skipped.suppressed++; continue; }
-      if (recentlyContacted(c.email, dedupeWindow())) { result.skipped.recent++; continue; }
-      leads.push(c._lead);
-    }
+    // Approval is necessary but not sufficient: re-screen at send time through the shared gate.
+    // The preview may be minutes or hours old, and someone can land on the do-not-contact list
+    // between review and launch.
+    const wanted = group.candidates.filter((c) => {
+      if (approved.has(norm(c.email))) return true;
+      result.skipped.notApproved++;
+      return false;
+    });
+    const { sendable, skipped } = screenForSend(wanted, { log });
+    result.skipped.suppressed += skipped.suppressed;
+    result.skipped.recent += skipped.recent;
+    const leads = sendable.map((c) => c._lead);
     if (!leads.length) continue;
 
     const formCtx = { companyName: group.company, jobPosition: group.roleTitle, jobSalary: group.roleSalary };
@@ -163,12 +175,31 @@ export async function commit(summary, approvedEmails, log, providers = defaultPr
       continue; // never touch Instantly or the contact log in dry-run
     }
 
-    const campaign = await p.createCampaign(group.company, log);
-    const { added } = await p.addLeads(campaign.id, leads, formCtx, log);
-    const activated = await p.activateCampaign(campaign.id, log);
-    recordContacts(leads.map((l) => ({ email: l.email, company: group.company, role: group.roleTitle, campaignId: campaign.id })));
-    result.campaigns.push({ company: group.company, campaignId: campaign.id, added, activated });
-    result.sent += added;
+    // createCampaign must be INSIDE the try. It was above it, so a throw here escaped without
+    // `partialSend` ever being set — the server then read `undefined` as falsy, released the
+    // commit claim, and the operator's retry re-emailed every group that had already succeeded.
+    // It is also the most throw-prone call in this loop: campaign creation is deliberately
+    // non-idempotent and runs with retries: 0.
+    try {
+      const campaign = await p.createCampaign(group.company, log, group.roleTitle);
+      const { added } = await p.addLeads(campaign.id, leads, formCtx, log);
+      // Leads are live from here: record BEFORE activating, so a failure in activateCampaign
+      // can't leave people emailable-but-unrecorded.
+      anyLeadsLive = true;
+      recordContacts(leads.map((l) => ({
+        email: l.email, company: group.company, role: group.roleTitle, campaignId: campaign.id,
+      })));
+      const activated = await p.activateCampaign(campaign.id, log);
+      result.campaigns.push({ company: group.company, role: group.roleTitle, campaignId: campaign.id, added, activated });
+      result.sent += added;
+    } catch (err) {
+      // Tell the caller whether anything already went out, so it keeps the commit claim rather
+      // than releasing it for a retry that would re-send to the groups that succeeded.
+      // This must NOT rely on the dedupe window as a backstop: dedupeWindowDays defaults to 0,
+      // and recentlyContacted returns false outright when it is, so there is no second net.
+      err.partialSend = anyLeadsLive;
+      throw err;
+    }
   }
   log?.info('approval commit done', result);
   return result;
@@ -189,11 +220,6 @@ async function attachGithub(candidates, p, log) {
   return matched;
 }
 
-function dedupeWindow() {
-  const n = Number(getSettings().dedupeWindowDays);
-  return Number.isFinite(n) ? n : 0; // 0 = cross-run dedup off (default)
-}
-
 function candidateFromMatch(m, company, roleTitle, roleSalary) {
   const c = m.candidate;
   return {
@@ -208,7 +234,7 @@ function candidateFromMatch(m, company, roleTitle, roleSalary) {
     breakdown: m.breakdown,
     ai: m.ai,
     github: c.github || null,
-    _lead: leadOf(c, roleTitle, roleSalary),
+    _lead: leadOf(c),
   };
 }
 
@@ -225,11 +251,16 @@ function candidateFromEnriched(c, company, roleTitle, roleSalary) {
     breakdown: null,
     ai: null,
     github: c.github || null,
-    _lead: leadOf(c, roleTitle, roleSalary),
+    _lead: leadOf(c),
   };
 }
 
-function leadOf(c, roleTitle) {
+/**
+ * The lead payload addLeads consumes. `title`/`company` are the candidate's CURRENT job and
+ * employer — the role being pitched reaches Instantly via formCtx ({{rolePosition}}), not here.
+ * (This took roleTitle/roleSalary params it never used, which read as though it did otherwise.)
+ */
+function leadOf(c) {
   return {
     firstName: c.firstName,
     lastName: c.lastName,

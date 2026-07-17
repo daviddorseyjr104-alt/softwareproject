@@ -67,9 +67,11 @@ export const demoProviders = {
     return gh;
   },
 
-  async createCampaign(companyName, log) {
-    const id = `demo-campaign-${slug(companyName)}`;
-    const name = `${companyName} – Candidate Outreach`;
+  // Mirrors the real provider: a company with two open roles gets one campaign per role, so the
+  // id must include the role too or the demo would silently collapse them into one.
+  async createCampaign(companyName, log, roleTitle = '') {
+    const id = `demo-campaign-${slug(companyName)}${roleTitle ? '-' + slug(roleTitle) : ''}`;
+    const name = roleTitle ? `${companyName} – ${roleTitle} – Candidate Outreach` : `${companyName} – Candidate Outreach`;
     log.info('[DEMO] campaign created', { id, name });
     return { id, name };
   },

@@ -30,8 +30,11 @@ function rankFromTitle(title) {
   if (/\b(cto|ceo|chief|vp|vice president)\b/.test(t)) return 6;
   if (/\b(director|head of)\b/.test(t)) return 5;
   if (/\b(principal|staff|lead|manager)\b/.test(t)) return 4;
-  if (/\bsenior|sr\.?\b/.test(t)) return 3;
-  if (/\b(junior|jr\.?|associate|entry)\b/.test(t)) return 1;
+  // `\bsenior|sr\.?\b` had no \b before "sr" (alternation binds looser than the anchors), so any
+  // title merely ENDING in those letters — "MSR", "Advisr" — was read as senior. Anchor both
+  // alternatives. A trailing "." doesn't need matching: \b already ends the token at it.
+  if (/\b(senior|sr)\b/.test(t)) return 3;
+  if (/\b(junior|jr|associate|entry)\b/.test(t)) return 1;
   if (/\bintern\b/.test(t)) return 0;
   return 2; // default: mid
 }

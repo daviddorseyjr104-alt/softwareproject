@@ -26,15 +26,19 @@ function load() {
   }
 }
 
+/**
+ * Write the list to disk. Deliberately throws on failure.
+ *
+ * This used to swallow every error, so a full or read-only disk returned "added" to the
+ * operator, worked in memory, and then lost the entry on restart — quietly re-enabling email
+ * to someone who asked never to be contacted. This is the one list whose write failure must be
+ * loud. Callers surface the error; the entry is rolled back so memory matches disk.
+ */
 function persist() {
-  try {
-    mkdirSync(bootConfig.dataDir, { recursive: true });
-    const tmp = `${FILE}.tmp`;
-    writeFileSync(tmp, JSON.stringify(store, null, 2));
-    renameSync(tmp, FILE);
-  } catch {
-    /* best-effort */
-  }
+  mkdirSync(bootConfig.dataDir, { recursive: true });
+  const tmp = `${FILE}.tmp`;
+  writeFileSync(tmp, JSON.stringify(store, null, 2));
+  renameSync(tmp, FILE); // atomic replace — a crash mid-write can't tear the file
 }
 
 /** True if this email — or its whole domain — is on the do-not-contact list. */
@@ -44,15 +48,42 @@ export function isSuppressed(email) {
   return store.emails.includes(e) || (domainOf(e) && store.domains.includes(domainOf(e)));
 }
 
-/** Add an entry. A value containing "@" is treated as an email; otherwise a domain. */
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const DOMAIN_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
+
+/**
+ * Classify an entry as an email or a whole domain.
+ *
+ * The leading "@" must be stripped BEFORE the bucket decision. It used to be stripped only in
+ * the domain branch, so "@competitor.com" — the most natural way to write "block this domain" —
+ * contained an "@", landed in `emails`, and matched nobody. The operator saw it listed and
+ * believed they were protected, and `unsuppress` (which did strip "@") couldn't even remove it.
+ *
+ * @returns {{bucket:'emails'|'domains', value:string}}
+ * @throws if the value is neither a valid email nor a valid domain.
+ */
+export function classify(value) {
+  const v = norm(value).replace(/^@/, '');
+  if (!v) throw new Error('Enter an email address or a domain.');
+  if (v.includes('@')) {
+    if (!EMAIL_RE.test(v)) throw new Error(`"${value}" is not a valid email address.`);
+    return { bucket: 'emails', value: v };
+  }
+  // A bare word like a typo'd "john" would otherwise silently blocklist a "john" domain.
+  if (!DOMAIN_RE.test(v)) throw new Error(`"${value}" is not a valid email address or domain.`);
+  return { bucket: 'domains', value: v };
+}
+
+/** Add an entry. "@acme.com" and "acme.com" both mean the whole domain. */
 export function suppress(value) {
-  const v = norm(value);
-  if (!v) return listSuppression();
-  const bucket = v.includes('@') ? 'emails' : 'domains';
-  const clean = bucket === 'domains' ? v.replace(/^@/, '') : v;
-  if (!store[bucket].includes(clean)) {
-    store[bucket].push(clean);
+  const { bucket, value: clean } = classify(value);
+  if (store[bucket].includes(clean)) return listSuppression();
+  store[bucket].push(clean);
+  try {
     persist();
+  } catch (err) {
+    store[bucket] = store[bucket].filter((x) => x !== clean); // keep memory consistent with disk
+    throw new Error(`Could not save the do-not-contact list: ${err.message}`);
   }
   return listSuppression();
 }
@@ -60,9 +91,15 @@ export function suppress(value) {
 /** Remove an entry (email or domain). */
 export function unsuppress(value) {
   const v = norm(value).replace(/^@/, '');
+  const before = { emails: [...store.emails], domains: [...store.domains] };
   store.emails = store.emails.filter((x) => x !== v);
   store.domains = store.domains.filter((x) => x !== v);
-  persist();
+  try {
+    persist();
+  } catch (err) {
+    store = before;
+    throw new Error(`Could not save the do-not-contact list: ${err.message}`);
+  }
   return listSuppression();
 }
 

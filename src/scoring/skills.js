@@ -4,6 +4,7 @@
 // required/nice-to-have skills against the text we DO have: the candidate's title, headline,
 // and (when present) any skills/keywords field. This is a heuristic signal; the AI fit score
 // does the deeper judgment.
+import { mentions } from './text.js';
 
 function candidateText(candidate) {
   return [
@@ -15,15 +16,6 @@ function candidateText(candidate) {
     .filter(Boolean)
     .join(' ')
     .toLowerCase();
-}
-
-/** Whole-word-ish match so "R" doesn't match "React" and "Go" doesn't match "Google". */
-function mentions(text, skill) {
-  const s = String(skill).toLowerCase().trim();
-  if (!s) return false;
-  const escaped = s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  // Boundaries that respect symbols common in tech names (c++, node.js, c#).
-  return new RegExp(`(^|[^a-z0-9+#.])${escaped}([^a-z0-9+#]|$)`, 'i').test(text);
 }
 
 /**
