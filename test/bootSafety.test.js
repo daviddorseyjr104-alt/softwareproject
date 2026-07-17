@@ -9,7 +9,7 @@
 // Everything else — weak-but-present credentials — warns.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { bootConfig, bootSafety } from '../src/config.js';
+import { bootConfig, bootSafety, isOnMountedVolume } from '../src/config.js';
 
 /** Run bootSafety against a temporary bootConfig state. */
 function withConfig(patch, fn) {
@@ -66,4 +66,60 @@ test('dev without secrets is fatal unless ALLOW_INSECURE_DEV is set', () => {
   } finally {
     if (prev === undefined) delete process.env.ALLOW_INSECURE_DEV; else process.env.ALLOW_INSECURE_DEV = prev;
   }
+});
+
+// ── DATA_DIR persistence ────────────────────────────────────────────────────
+// DATA_DIR holds suppression.json (the do-not-contact list), the contact audit trail, the
+// company pool, and the encrypted API keys. On throwaway container storage every deploy erases
+// all of it, so someone who unsubscribed becomes emailable again — silently. Persistence lives
+// in the HOST's config (a Render `disk:`, a Railway volume), never in the repo, so it vanishes
+// the moment you change hosts. These fixtures are real /proc/mounts shapes.
+// A container with NO volume: the only ancestor of /var/data is "/", the writable image layer.
+const NO_VOLUME = `overlay / overlay rw,relatime,lowerdir=/var/lib/docker/overlay2/l/X 0 0
+proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0
+tmpfs /dev tmpfs rw,nosuid,size=65536k,mode=755 0 0
+sysfs /sys sysfs ro,nosuid,nodev,noexec,relatime 0 0
+/dev/sda1 /etc/hosts ext4 rw,relatime 0 0`;
+
+// The same container WITH a volume mounted at /var/data (Railway volume, Render disk, k8s PVC).
+const WITH_VOLUME = `${NO_VOLUME}
+/dev/sdb /var/data ext4 rw,relatime 0 0`;
+
+test('a container with no volume is correctly reported as throwaway storage', () => {
+  assert.equal(isOnMountedVolume('/var/data', NO_VOLUME), false,
+    '"/" is the image\'s own writable layer — it must NOT count as persistence');
+});
+
+test('a volume mounted at DATA_DIR is detected', () => {
+  assert.equal(isOnMountedVolume('/var/data', WITH_VOLUME), true);
+});
+
+test('a volume mounted at an ancestor of DATA_DIR counts', () => {
+  const atParent = `${NO_VOLUME}\n/dev/sdb /var ext4 rw,relatime 0 0`;
+  assert.equal(isOnMountedVolume('/var/data', atParent), true);
+});
+
+test('a similarly-named mount does not count as a parent', () => {
+  // /var/database must not satisfy /var/data — prefix matching has to respect path boundaries.
+  const decoy = `${NO_VOLUME}\n/dev/sdb /var/database ext4 rw,relatime 0 0`;
+  assert.equal(isOnMountedVolume('/var/data', decoy), false);
+});
+
+test('mount points containing escaped spaces are parsed', () => {
+  // /proc/mounts escapes a space in a mount point as the four characters \040. Built by
+  // concatenation because an octal escape is a syntax error inside a template literal.
+  const spaced = NO_VOLUME + '\n/dev/sdb /var/my\\040data ext4 rw,relatime 0 0';
+  assert.equal(isOnMountedVolume('/var/my data', spaced), true);
+});
+
+test('unreadable mounts means unknown, never a false "persisted"', () => {
+  assert.equal(isOnMountedVolume('/var/data', ''), false);
+  assert.equal(isOnMountedVolume('/var/data', null), false);
+});
+
+test('ephemeral storage warns in production but never blocks boot', () => {
+  // Fatal here would take down the console that explains the problem — and it is the host's
+  // config to fix, not something a restart can resolve.
+  const { fatal } = withConfig({ ...PROD }, bootSafety);
+  assert.deepEqual(fatal, [], 'storage is never a reason to refuse to start');
 });

@@ -1,0 +1,47 @@
+# Railway deploy config (https://railway.app).
+#
+# Railway does NOT read render.yaml. That file describes the Render deploy, including the
+# persistent `disk:` — so deploying this repo to Railway without the volume below gives you a
+# working-looking app whose do-not-contact list and contact audit trail are ERASED on every
+# deploy. The app now detects this and shows a standing banner in /admin; this file plus the
+# volume step in docs/DEPLOY.md is the fix.
+
+[build]
+# Use the repo's Dockerfile rather than Nixpacks auto-detection, so local and deployed builds
+# are the same thing.
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# The app refuses to boot without WEBHOOK_SECRET / ADMIN_PASSWORD / SECRET_KEY, and exits 1 with
+# the reason on stdout. If a deploy never turns healthy, read the SERVICE logs — a failed health
+# check only tells you it didn't answer, never why.
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+numReplicas = 1
+
+# ── Required manual setup on Railway ────────────────────────────────────────────
+#
+# 1. VOLUME (do this first — without it the app silently forgets its safety lists).
+#    Service → Settings → Volumes → add one with mount path exactly:
+#        /var/data
+#    That path must match DATA_DIR (the Dockerfile sets DATA_DIR=/var/data).
+#    Verify: /admin shows no "Your data is not being saved" banner.
+#
+# 2. VARIABLES (Service → Variables). The app will not start without these:
+#        ADMIN_PASSWORD   — the /admin password. 16+ random characters.
+#        SECRET_KEY       — signs sessions AND encrypts stored API keys.
+#                           openssl rand -hex 32
+#                           NEVER change this after saving keys: it is the decryption key, and
+#                           rotating it makes every saved key unreadable.
+#        WEBHOOK_SECRET   — what the GoHighLevel/Flowsa form must send as an
+#                           `x-webhook-secret` header. openssl rand -hex 32
+#
+#    NODE_ENV and DATA_DIR are set by the Dockerfile; you don't need to add them.
+#    Railway injects PORT automatically and the app honours it.
+#
+# 3. Replicas stay at 1. The job store, the login rate limiter, and the commit claim that stops
+#    double-sends are all in-process. Two replicas means two of everything — including two
+#    launches of the same approved run.

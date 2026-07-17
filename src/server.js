@@ -3,7 +3,7 @@ import express from 'express';
 import crypto, { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { bootConfig, bootSafety } from './config.js';
+import { bootConfig, bootSafety, dataDirPersistence } from './config.js';
 import { getSettings, getMaskedSettings, updateSettings } from './settings.js';
 import { logger } from './logger.js';
 import { parseForm } from './form.js';
@@ -546,6 +546,10 @@ app.get('/admin/api/status', (_req, res) => {
     ready: canPreview && pool.ok,
     webhookSecretSet: Boolean(bootConfig.webhookSecret),
     adminProtected: !adminOpen(),
+    // Surfaced so the console can warn: on throwaway storage the do-not-contact list and the
+    // audit trail silently reset on every deploy.
+    dataPersisted: dataDirPersistence(),
+    dataDir: bootConfig.dataDir,
   });
 });
 

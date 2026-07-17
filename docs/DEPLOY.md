@@ -3,12 +3,66 @@
 This gets the Candidate Finder running at a public HTTPS URL so a GoHighLevel/Flowsa form can reach
 it, and lets the client manage everything from a browser. ~20 minutes.
 
-The recommended host is **Render** (simple, HTTPS + secrets + keeps the app alive). Any Node ≥18 or
+Works on **Railway** or **Render** (both give HTTPS + secrets + keep the app alive). Any Node ≥18 or
 Docker host works too.
 
 ---
 
-## Part A — Deploy on Render (recommended)
+## ⚠️ Read this first, whichever host you pick: the volume
+
+`DATA_DIR` (the Dockerfile sets it to `/var/data`) holds:
+
+- `suppression.json` — **your do-not-contact list**
+- `contacts.json` — the contact audit trail (your compliance record)
+- `companies.json` — your companies and open roles
+- `settings.json` — your API keys, encrypted
+
+**If that path isn't a real mounted volume, all of it is erased on every deploy and restart** —
+so someone who unsubscribed becomes emailable again, and the audit trail resets to empty. Nothing
+looks broken when this happens, which is what makes it dangerous.
+
+The persistence is configured on the **host**, not in this repo, so it does not follow you when you
+change hosts — `render.yaml`'s `disk:` block means nothing to Railway, and `railway.toml` means
+nothing to Render.
+
+You don't have to take this on trust: the app checks at boot. If `/admin` shows a red
+**"Your data is not being saved"** banner, the volume is missing. No banner, you're fine.
+
+---
+
+## Part A1 — Deploy on Railway
+
+1. **Push the code to GitHub**, then Railway → **New Project** → **Deploy from GitHub repo**.
+   Railway reads [`railway.toml`](../railway.toml) and builds the `Dockerfile`.
+
+2. **Add the volume — do this first.** Service → **Settings** → **Volumes** → add one, mount path
+   exactly:
+   ```
+   /var/data
+   ```
+   It must match `DATA_DIR`. Skip this and see the warning above.
+
+3. **Set the variables** (Service → **Variables**). The app *refuses to start* without these:
+   | Key | What to enter |
+   |---|---|
+   | `ADMIN_PASSWORD` | **You choose this** — the `/admin` password. 16+ random characters. |
+   | `SECRET_KEY` | `openssl rand -hex 32`. Signs sessions + encrypts stored API keys. **Never change it after saving keys** — it *is* the decryption key. |
+   | `WEBHOOK_SECRET` | `openssl rand -hex 32`. What the form must send as an `x-webhook-secret` header. |
+
+   `NODE_ENV` and `DATA_DIR` come from the Dockerfile. Railway injects `PORT` and the app uses it.
+
+4. **Keep replicas at 1.** The job store, the login rate limiter, and the commit claim that
+   prevents double-sends are all in-process. Two replicas means two of everything — including two
+   launches of the same approved run.
+
+5. **If the deploy never turns healthy**, read the **service** logs, not the build logs. The app
+   prints exactly why it refused to start; a failed health check only tells you it didn't answer.
+
+Then skip to **Part C**.
+
+---
+
+## Part A — Deploy on Render
 
 1. **Get the code into a Git repo** (GitHub/GitLab). From the project folder:
    ```bash

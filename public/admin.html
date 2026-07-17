@@ -295,6 +295,8 @@
        2.4s, was announced to no screen reader, and could not be recalled — including commit
        failures, the one moment where money and reputation are on the line. -->
   <div id="error-bar" hidden></div>
+  <!-- Standing storage warning. Rendered by loadStatus(); empty when the volume is fine. -->
+  <div id="storage-warn"></div>
 
   <!-- DASHBOARD -->
   <section class="panel active" id="panel-dashboard" role="tabpanel" tabindex="0" aria-label="Dashboard">
@@ -1128,6 +1130,24 @@ async function loadStatus() {
     `<button type="button" class="pill click" onclick="goTab('${tab}')" aria-label="${esc(label)}: ${said(state)}. Go to settings.">
       ${mark(state)} ${esc(label)}${extra}</button>`;
   const keyPill = (set, label) => pill(set ? 'ok' : 'bad', label, 'keys');
+
+  // Storage warning. This is the highest-stakes misconfiguration the app can have and it is
+  // completely invisible otherwise: on throwaway container storage the do-not-contact list is
+  // erased by every deploy, so someone who unsubscribed becomes emailable again — and nothing
+  // looks wrong. It stays on screen (not a toast) until the host is actually fixed.
+  const disk = st.dataPersisted;
+  $('storage-warn').innerHTML = (disk?.known && !disk.persisted)
+    ? `<div class="banner errb" role="alert">
+        <strong>⚠️ Your data is not being saved.</strong>
+        <div class="banner-help">
+          <code>${esc(st.dataDir || 'DATA_DIR')}</code> is throwaway container storage, so your
+          <strong>do-not-contact list</strong>, contact audit trail, company pool and saved API keys are
+          <strong>erased on every deploy and restart</strong> — people who unsubscribed can be emailed again,
+          and the compliance trail resets to empty.
+          <br>Fix: attach a persistent volume at that path on your host (Railway → service → Variables →
+          Volumes; Render → Disks), then redeploy. See <code>docs/DEPLOY.md</code>.
+        </div></div>`
+    : '';
 
   $('status').innerHTML = `<div class="statusgrid">
     ${keyPill(k.apollo.set, 'Apollo')}${keyPill(k.salesql.set, 'SalesQL')}${keyPill(k.instantly.set, 'Instantly')}
